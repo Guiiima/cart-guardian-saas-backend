@@ -100,7 +100,7 @@ public class ShopifyAuthController {
         shopEntity.setInstalledAt(Instant.now());
         shopRepository.save(shopEntity);
 
-        registerCheckoutCreateWebhook(shop, accessToken);
+        registerCheckoutUpdateWebhook(shop, accessToken);
 
         logger.info("Loja salva/atualizada no banco de dados com sucesso!");
 
@@ -110,7 +110,7 @@ public class ShopifyAuthController {
     /**
      * Registra o webhook para o tópico 'checkouts/create' na API da Shopify.
      */
-    private void registerCheckoutCreateWebhook(String shopUrl, String accessToken) {
+    private void registerCheckoutUpdateWebhook(String shopUrl, String accessToken) {
         String webhookEndpoint = "https://7d3c86adeea9.ngrok-free.app/webhooks/checkouts/update";
 
         String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2024-07/webhooks.json";
@@ -151,7 +151,6 @@ public class ShopifyAuthController {
     }
 
     private boolean isValidHmac(Map<String, String[]> parameterMap, String secretKey) {
-        // ... (seu método de validação de HMAC está correto, sem alterações)
         String hmacFromRequest = parameterMap.get("hmac")[0];
         String data = parameterMap.entrySet().stream()
                 .filter(entry -> !entry.getKey().equals("hmac"))
