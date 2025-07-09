@@ -52,7 +52,7 @@ public class ShopifyAuthController {
         String redirectUri = "https://c4844bff8e6a.ngrok-free.app/shopify/callback";
 
 
-        String scopes = "read_checkouts";
+        String scopes = "read_checkouts, read_orders, write_checkouts, write_orders";
 
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;

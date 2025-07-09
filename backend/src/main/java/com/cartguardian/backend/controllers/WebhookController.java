@@ -1,6 +1,11 @@
 package com.cartguardian.backend.controllers;
 
+import com.cartguardian.backend.dto.CheckoutDTO;
+import com.cartguardian.backend.model.AbandonedCheckout;
+import com.cartguardian.backend.repository.AbandonedCheckoutRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.Base64;
 
 @RestController
@@ -22,6 +28,11 @@ public class WebhookController {
     @Value("${shopify.api.secret}")
     private String apiSecret;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private AbandonedCheckoutRepository abandonedCheckoutRepository;
     /**
      * Este endpoint receberá os webhooks de criação de checkout da Shopify.
      * @param payload O corpo (body) da requisição, contendo os dados do checkout.
@@ -44,16 +55,27 @@ public class WebhookController {
 
         System.out.println("HMAC do webhook validado com sucesso!");
         System.out.println("Payload recebido:");
-        System.out.println(payload); // Imprime os dados do checkout abandonado
+        try {
+            CheckoutDTO checkoutData = objectMapper.readValue(payload, CheckoutDTO.class);
 
-        // TODO: Lógica futura
-        // 1. Parsear o 'payload' (JSON) para um objeto Java.
-        // 2. Salvar as informações importantes (ID do checkout, e-mail, abandoned_checkout_url) no banco.
-        // 3. Agendar o envio do e-mail de recuperação.
+            AbandonedCheckout newCheckout = new AbandonedCheckout();
+            newCheckout.setShopifyCheckoutId(checkoutData.getId().toString());
+            newCheckout.setCustomerEmail(checkoutData.getEmail());
+            newCheckout.setRecoveryUrl(checkoutData.getAbandonedCheckoutUrl());
+            newCheckout.setStatus("PENDING"); // Define o status inicial
+            newCheckout.setCreatedAt(Instant.now());
 
-        // Responde à Shopify com status 200 OK para confirmar o recebimento.
-        // Se você não responder 200, a Shopify tentará enviar o webhook novamente.
-        return new ResponseEntity<>("Webhook recebido.", HttpStatus.OK);
+            abandonedCheckoutRepository.save(newCheckout);
+
+            System.out.println("Checkout abandonado salvo no banco de dados! E-mail: " + newCheckout.getCustomerEmail());
+
+        } catch (Exception e) {
+            System.err.println("Erro ao processar o payload do webhook: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>("Erro no processamento.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return new ResponseEntity<>("Webhook recebido e processado.", HttpStatus.OK);
     }
 
     /**
