@@ -7,6 +7,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -29,6 +32,8 @@ import java.util.stream.Collectors;
 
 @RestController
 public class ShopifyAuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ShopifyAuthController.class);
 
     @Value("${shopify.api.key}")
     private String apiKey;
@@ -45,7 +50,10 @@ public class ShopifyAuthController {
     @GetMapping("/shopify/install")
     public void install(@RequestParam("shop") String shop, HttpServletResponse response) throws IOException {
         String redirectUri = "https://c4844bff8e6a.ngrok-free.app/shopify/callback";
-        String scopes = "read_checkouts,read_products";
+
+
+        String scopes = "read_checkouts";
+
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;
         response.sendRedirect(installUrl);
@@ -58,6 +66,7 @@ public class ShopifyAuthController {
         Map<String, String[]> parameterMap = request.getParameterMap();
 
         if (!isValidHmac(parameterMap, apiSecret)) {
+            logger.error("HMAC inválido para a loja {}. Abortando.", shop);
             return "Erro de segurança: HMAC inválido.";
         }
 
@@ -78,48 +87,42 @@ public class ShopifyAuthController {
                 .bodyToMono(String.class)
                 .block();
 
-        System.out.println("Resposta da Shopify (contém o access_token): " + jsonResponse);
-        // **PASSO 1: LER O JSON**
+        logger.info("Resposta da Shopify (contém o access_token): {}", jsonResponse);
         ShopifyTokenResponse tokenResponse = objectMapper.readValue(jsonResponse, ShopifyTokenResponse.class);
         String accessToken = tokenResponse.getAccessToken();
 
-        System.out.println("Access Token extraído com sucesso: " + accessToken);
+        logger.info("Access Token extraído com sucesso: {}", accessToken);
 
-        // **PASSO 2 e 3: SALVAR NO BANCO**
-        // Verifica se a loja já existe no nosso banco de dados
-        Shop shopEntity = shopRepository.findByShopUrl(shop)
-                .orElse(new Shop()); // Se não existir, cria uma nova instância
-
+        Shop shopEntity = shopRepository.findByShopUrl(shop).orElse(new Shop());
         shopEntity.setShopUrl(shop);
-        shopEntity.setAccessToken(accessToken); // Salva ou atualiza o token
+        shopEntity.setAccessToken(accessToken);
         shopEntity.setActive(true);
         shopEntity.setInstalledAt(Instant.now());
-
         shopRepository.save(shopEntity);
+
         registerCheckoutCreateWebhook(shop, accessToken);
-        System.out.println("Loja salva/atualizada no banco de dados com sucesso!");
+
+        logger.info("Loja salva/atualizada no banco de dados com sucesso!");
 
         return "App instalado e autenticado com sucesso! Token recebido.";
     }
+
     /**
      * Registra o webhook para o tópico 'checkouts/create' na API da Shopify.
-     * @param shopUrl A URL da loja.
-     * @param accessToken O token de acesso para a loja.
      */
     private void registerCheckoutCreateWebhook(String shopUrl, String accessToken) {
-        String webhookEndpoint = "https://c4844bff8e6a.ngrok-free.app/webhooks/checkouts/create"; // ATENÇÃO: Use sua URL atual do ngrok!
-        String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2025-07/webhooks.json";
+        String webhookEndpoint = "https://c4844bff8e6a.ngrok-free.app/webhooks/checkouts/create";
 
-        // Corpo da requisição para criar o webhook
-        String jsonBody = String.format("""
-            {
-                "webhook": {
-                    "topic": "checkouts/create",
-                    "address": "%s",
-                    "format": "json"
-                }
-            }
-            """, webhookEndpoint);
+        String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2024-07/webhooks.json";
+
+
+        Map<String, Object> webhookPayload = Map.of(
+                "webhook", Map.of(
+                        "topic", "checkouts/create",
+                        "address", webhookEndpoint,
+                        "format", "json"
+                )
+        );
 
         WebClient webClient = WebClient.create();
         try {
@@ -127,18 +130,28 @@ public class ShopifyAuthController {
                     .uri(shopifyApiUrl)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .header("X-Shopify-Access-Token", accessToken)
-                    .bodyValue(jsonBody)
+                    .bodyValue(webhookPayload)
                     .retrieve()
-                    .bodyToMono(String.class)
-                    .block(); // Usar block para simplicidade aqui
 
-            System.out.println("Resposta do registro de webhook: " + response);
+                    .onStatus(
+                            status -> status.is4xxClientError() || status.is5xxServerError(),
+                            clientResponse -> clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> {
+                                        logger.error("Erro da API da Shopify: Status {} | Corpo: {}", clientResponse.statusCode(), errorBody);
+                                        return Mono.error(new RuntimeException("Erro da API da Shopify: " + clientResponse.statusCode()));
+                                    })
+                    )
+                    .bodyToMono(String.class)
+                    .block();
+
+            logger.info("Resposta do registro de webhook: {}", response);
         } catch (Exception e) {
-            System.err.println("Falha ao registrar o webhook: " + e.getMessage());
+            logger.error("Falha ao registrar o webhook: {}", e.getMessage());
         }
     }
 
     private boolean isValidHmac(Map<String, String[]> parameterMap, String secretKey) {
+        // ... (seu método de validação de HMAC está correto, sem alterações)
         String hmacFromRequest = parameterMap.get("hmac")[0];
         String data = parameterMap.entrySet().stream()
                 .filter(entry -> !entry.getKey().equals("hmac"))
