@@ -88,7 +88,7 @@ public class ShopifyAuthController {
 
         logger.info("Access Token extraído com sucesso: {}", accessToken);
 
-        shopService.saveOrUpdateShop(shop, accessToken);
+        //shopService.saveOrUpdateShop(shop, accessToken, );
 
         registerCheckoutUpdateWebhook(shop, accessToken);
 
