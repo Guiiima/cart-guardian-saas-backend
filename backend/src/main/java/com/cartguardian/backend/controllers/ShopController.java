@@ -1,4 +1,4 @@
 package com.cartguardian.backend.controllers;
 
-public class TestController{
+public class ShopController {
 }

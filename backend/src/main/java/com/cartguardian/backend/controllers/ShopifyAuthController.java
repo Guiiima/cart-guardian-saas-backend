@@ -1,8 +1,7 @@
 package com.cartguardian.backend.controllers;
 
 import com.cartguardian.backend.dto.ShopifyTokenResponse;
-import com.cartguardian.backend.model.Shop;
-import com.cartguardian.backend.repository.ShopRepository;
+import com.cartguardian.backend.service.ShopServiceFirestore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,18 +40,15 @@ public class ShopifyAuthController {
     private String apiSecret;
 
     @Autowired
-    private ShopRepository shopRepository;
+    private ShopServiceFirestore shopService;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @GetMapping("/shopify/install")
     public void install(@RequestParam("shop") String shop, HttpServletResponse response) throws IOException {
-        String redirectUri = "https://41a069384224.ngrok-free.app/shopify/callback";
-
-
+        String redirectUri = "https://020edc622400.ngrok-free.app/shopify/callback";
         String scopes = "read_checkouts, read_orders, write_checkouts, write_orders";
-
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;
         response.sendRedirect(installUrl);
@@ -93,12 +88,7 @@ public class ShopifyAuthController {
 
         logger.info("Access Token extraído com sucesso: {}", accessToken);
 
-        Shop shopEntity = shopRepository.findByShopUrl(shop).orElse(new Shop());
-        shopEntity.setShopUrl(shop);
-        shopEntity.setAccessToken(accessToken);
-        shopEntity.setActive(true);
-        shopEntity.setInstalledAt(Instant.now());
-        shopRepository.save(shopEntity);
+        shopService.saveOrUpdateShop(shop, accessToken);
 
         registerCheckoutUpdateWebhook(shop, accessToken);
 
@@ -111,7 +101,7 @@ public class ShopifyAuthController {
      * Registra o webhook para o tópico 'checkouts/create' na API da Shopify.
      */
     private void registerCheckoutUpdateWebhook(String shopUrl, String accessToken) {
-        String webhookEndpoint = "https://41a069384224.ngrok-free.app/webhooks/checkouts/update";
+        String webhookEndpoint = "https://020edc622400.ngrok-free.app/webhooks/checkouts/update";
 
         String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2024-07/webhooks.json";
 
