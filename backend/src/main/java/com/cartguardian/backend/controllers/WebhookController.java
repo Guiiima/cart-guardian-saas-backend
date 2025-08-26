@@ -56,10 +56,11 @@ public class WebhookController {
             checkout.setShopifyCheckoutId(checkoutData.getId().toString());
             checkout.setCustomerEmail(checkoutData.getEmail());
             checkout.setRecoveryUrl(checkoutData.getAbandonedCheckoutUrl());
+            checkout.setShopUrl(shopHeader);
             checkout.setStatus("PENDING");
             checkout.setCreatedAt(Instant.now());
 
-            abandonedCheckoutService.saveCheckout(checkout);
+            abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
 
             System.out.println("Checkout abandonado salvo com e-mail: " + checkout.getCustomerEmail());
             return new ResponseEntity<>("Checkout salvo.", HttpStatus.OK);

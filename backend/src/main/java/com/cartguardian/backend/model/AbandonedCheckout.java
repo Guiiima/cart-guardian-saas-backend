@@ -20,6 +20,9 @@ public class AbandonedCheckout {
     @Column(nullable = false, length = 1024)
     private String recoveryUrl;
 
+    @Column(nullable = false) // Novo campo adicionado
+    private String shopUrl;
+
     private String status; // Ex: "PENDING", "SENT_EMAIL_1", "RECOVERED"
 
     private Instant createdAt;
@@ -33,6 +36,8 @@ public class AbandonedCheckout {
     public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
     public String getRecoveryUrl() { return recoveryUrl; }
     public void setRecoveryUrl(String recoveryUrl) { this.recoveryUrl = recoveryUrl; }
+    public String getShopUrl() { return shopUrl; } // Getter para o novo campo
+    public void setShopUrl(String shopUrl) { this.shopUrl = shopUrl; } // Setter para o novo campo
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }

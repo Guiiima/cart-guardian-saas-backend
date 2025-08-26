@@ -2,9 +2,7 @@ package com.cartguardian.backend.service;
 
 import com.cartguardian.backend.model.AbandonedCheckout;
 import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.WriteResult;
+import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,29 +12,47 @@ import java.util.concurrent.ExecutionException;
 
 @Service
 public class AbandonedCheckoutService {
+
     private static final Logger logger = LoggerFactory.getLogger(AbandonedCheckoutService.class);
-    private static final String COLLECTION_NAME = "carrinhosAbandonados"; // Nome da coleção no Firestore
+    private static final String COLLECTION_NAME = "carrinhosAbandonados";
 
     /**
-     * Salva um novo registro de checkout abandonado no Firestore.
+     * Salva um checkout no Firestore usando uma transação para garantir que não haja duplicatas,
+     * mesmo com múltiplas requisições simultâneas.
+     *
      * @param checkout O objeto AbandonedCheckout a ser salvo.
-     * @return O ID do novo documento criado no Firestore.
      */
-    public String saveCheckout(AbandonedCheckout checkout) throws ExecutionException, InterruptedException {
+    public void saveCheckoutIfNotExists(AbandonedCheckout checkout) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();
 
-        // Cria uma referência para um novo documento com ID gerado automaticamente
-        DocumentReference docRef = db.collection(COLLECTION_NAME).document();
+        // Cria a consulta para verificar a existência do checkout
+        Query query = db.collection(COLLECTION_NAME)
+                .whereEqualTo("shopifyCheckoutId", checkout.getShopifyCheckoutId())
+                .limit(1);
 
-        // Salva o objeto no novo documento
-        ApiFuture<WriteResult> future = docRef.set(checkout);
+        // Roda a lógica de verificação e gravação dentro de uma transação
+        ApiFuture<String> futureTransaction = db.runTransaction(transaction -> {
+            // 1. Executa a leitura (a busca) DENTRO da transação
+            QuerySnapshot snapshot = transaction.get(query).get();
 
-        // Espera a confirmação do Firebase (opcional, mas bom para garantir a gravação)
-        WriteResult result = future.get();
+            // 2. Se não encontrou documentos, pode salvar
+            if (snapshot.isEmpty()) {
+                DocumentReference newCheckoutRef = db.collection(COLLECTION_NAME).document();
+                // Executa a escrita DENTRO da transação
+                transaction.set(newCheckoutRef, checkout);
+                logger.info("Novo checkout abandonado {} sendo salvo com ID: {}",
+                        checkout.getShopifyCheckoutId(), newCheckoutRef.getId());
+                return newCheckoutRef.getId(); // Retorna o ID do novo documento
+            } else {
+                // 3. Se encontrou, a transação termina e não faz nada
+                String existingId = snapshot.getDocuments().get(0).getId();
+                logger.warn("Transação cancelada. Checkout duplicado. ShopifyCheckoutId: {} já existe no documento ID: {}",
+                        checkout.getShopifyCheckoutId(), existingId);
+                return null; // Retorna null para indicar duplicidade
+            }
+        });
 
-        logger.info("Checkout abandonado {} salvo com sucesso! Update time: {}",
-                checkout.getShopifyCheckoutId(), result.getUpdateTime());
-
-        return docRef.getId();
+        // Espera a transação ser completada e retorna o resultado
+        futureTransaction.get();
     }
 }

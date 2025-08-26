@@ -15,6 +15,10 @@ public class CheckoutDTO {
     @JsonProperty("abandoned_checkout_url")
     private String abandonedCheckoutUrl;
 
+    // Novo campo adicionado - não precisa de @JsonProperty
+    // pois será preenchido a partir do header do webhook.
+    private String shopUrl;
+
     // Getters e Setters
     public Long getId() {
         return id;
@@ -38,5 +42,14 @@ public class CheckoutDTO {
 
     public void setAbandonedCheckoutUrl(String abandonedCheckoutUrl) {
         this.abandonedCheckoutUrl = abandonedCheckoutUrl;
+    }
+
+    // Getters e Setters para o novo campo
+    public String getShopUrl() {
+        return shopUrl;
+    }
+
+    public void setShopUrl(String shopUrl) {
+        this.shopUrl = shopUrl;
     }
 }
