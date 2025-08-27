@@ -39,6 +39,10 @@ public class ShopifyAuthController {
     @Value("${shopify.api.secret}")
     private String apiSecret;
 
+    @Value("${app.base-url}")
+    private String appBaseUrl;
+
+
     @Autowired
     private ShopServiceFirestore shopService;
 
@@ -47,7 +51,7 @@ public class ShopifyAuthController {
 
     @GetMapping("/shopify/install")
     public void install(@RequestParam("shop") String shop, HttpServletResponse response) throws IOException {
-        String redirectUri = "https://020edc622400.ngrok-free.app/shopify/callback";
+        String redirectUri = appBaseUrl + "/shopify/callback";
         String scopes = "read_checkouts, read_orders, write_checkouts, write_orders";
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;
@@ -101,7 +105,7 @@ public class ShopifyAuthController {
      * Registra o webhook para o tópico 'checkouts/create' na API da Shopify.
      */
     private void registerCheckoutUpdateWebhook(String shopUrl, String accessToken) {
-        String webhookEndpoint = "https://020edc622400.ngrok-free.app/webhooks/checkouts/update";
+        String webhookEndpoint = appBaseUrl + "/webhooks/checkouts/update";
 
         String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2024-07/webhooks.json";
 

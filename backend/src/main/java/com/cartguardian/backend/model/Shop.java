@@ -8,9 +8,15 @@ public class Shop {
     private String accessToken;
     private boolean active;
     private Instant installedAt;
+    private String logoUrl; // <-- NOVO CAMPO
 
     public Shop() {}
 
+
+
+    // Getters e Setters para logoUrl
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
     public String getShopUrl() { return shopUrl; }
     public void setShopUrl(String shopUrl) { this.shopUrl = shopUrl; }
     public String getAccessToken() { return accessToken; }

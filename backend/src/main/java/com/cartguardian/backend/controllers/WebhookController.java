@@ -4,6 +4,7 @@ import com.cartguardian.backend.dto.CheckoutDTO;
 import com.cartguardian.backend.model.AbandonedCheckout;
 import com.cartguardian.backend.repository.AbandonedCheckoutRepository;
 import com.cartguardian.backend.service.AbandonedCheckoutService;
+import com.cartguardian.backend.service.EmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,9 @@ public class WebhookController {
 
     @Autowired
     private AbandonedCheckoutService abandonedCheckoutService;
+
+    @Autowired
+    private EmailService emailService;
 
     @PostMapping("/webhooks/checkouts/update")
     public ResponseEntity<String> handleCheckoutUpdateWebhook(
@@ -59,8 +63,9 @@ public class WebhookController {
             checkout.setShopUrl(shopHeader);
             checkout.setStatus("PENDING");
             checkout.setCreatedAt(Instant.now());
+            //emailService.enviarEmailDeRecuperacao("guilhermeh000@hotmail.com", checkoutData.getAbandonedCheckoutUrl());
 
-            abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
+            //abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
 
             System.out.println("Checkout abandonado salvo com e-mail: " + checkout.getCustomerEmail());
             return new ResponseEntity<>("Checkout salvo.", HttpStatus.OK);
