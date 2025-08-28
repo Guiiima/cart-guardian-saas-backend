@@ -72,28 +72,26 @@ public class WebhookController {
                 return new ResponseEntity<>("E-mail ausente. Ignorado.", HttpStatus.OK);
             }
 
-            // 1. Busca os dados da loja (incluindo o accessToken) no Firestore
             Optional<Shop> shopOptional = shopService.findShopByUrl(shopUrl);
             if (shopOptional.isEmpty()) {
                 logger.error("Loja {} não encontrada em nosso banco de dados.", shopUrl);
                 return new ResponseEntity<>("Loja não registrada.", HttpStatus.BAD_REQUEST);
             }
             Shop shop = shopOptional.get();
+            String lojaId = shop.getId();
             String accessToken = shop.getAccessToken();
 
-            // 2. Monta o objeto AbandonedCheckout com os dados do webhook
             AbandonedCheckout checkout = new AbandonedCheckout();
+            checkout.setLojaId(lojaId); // <-- USA O ID IMUTÁVEL AQUI!
             checkout.setShopifyCheckoutId(checkoutData.getId().toString());
             checkout.setCustomerEmail(checkoutData.getEmail());
             checkout.setRecoveryUrl(checkoutData.getAbandonedCheckoutUrl());
-            checkout.setShopUrl(shopUrl);
+            checkout.setShopUrl(shopUrl); // Guarda a shopUrl também, pode ser útil
             checkout.setStatus("PENDING");
             checkout.setCreatedAt(Instant.now());
 
-            // 3. Salva o checkout no Firestore (se for novo)
             abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
 
-            // 4. Prepara a lista de produtos para o e-mail, buscando as imagens
             List<EmailService.ItemCarrinho> produtosNoCarrinho = new ArrayList<>();
             for (LineItemDTO lineItem : checkoutData.getLineItems()) {
                 // Para cada item, busca a URL da sua imagem usando o accessToken

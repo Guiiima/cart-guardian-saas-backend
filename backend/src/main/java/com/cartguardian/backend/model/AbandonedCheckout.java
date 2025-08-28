@@ -1,45 +1,72 @@
 package com.cartguardian.backend.model;
 
-import jakarta.persistence.*;
 import java.time.Instant;
 
-@Entity
-@Table(name = "abandoned_checkouts")
 public class AbandonedCheckout {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
+    private String lojaId; // "Chave estrangeira" para o documento da loja
     private String shopifyCheckoutId;
-
-    @Column(nullable = true)
     private String customerEmail;
-
-    @Column(nullable = false, length = 1024)
     private String recoveryUrl;
-
-    @Column(nullable = false) // Novo campo adicionado
     private String shopUrl;
-
-    private String status; // Ex: "PENDING", "SENT_EMAIL_1", "RECOVERED"
-
+    private String status;
     private Instant createdAt;
 
-    // Getters e Setters...
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getShopifyCheckoutId() { return shopifyCheckoutId; }
-    public void setShopifyCheckoutId(String shopifyCheckoutId) { this.shopifyCheckoutId = shopifyCheckoutId; }
-    public String getCustomerEmail() { return customerEmail; }
-    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
-    public String getRecoveryUrl() { return recoveryUrl; }
-    public void setRecoveryUrl(String recoveryUrl) { this.recoveryUrl = recoveryUrl; }
-    public String getShopUrl() { return shopUrl; } // Getter para o novo campo
-    public void setShopUrl(String shopUrl) { this.shopUrl = shopUrl; } // Setter para o novo campo
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public AbandonedCheckout() {}
+
+    // Getter e Setter para lojaId
+    public String getLojaId() {
+        return lojaId;
+    }
+    public void setLojaId(String lojaId) {
+        this.lojaId = lojaId;
+    }
+
+    // Getter e Setter para shopifyCheckoutId
+    public String getShopifyCheckoutId() {
+        return shopifyCheckoutId;
+    }
+    public void setShopifyCheckoutId(String shopifyCheckoutId) {
+        this.shopifyCheckoutId = shopifyCheckoutId;
+    }
+
+    // Getter e Setter para customerEmail
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    // Getter e Setter para recoveryUrl
+    public String getRecoveryUrl() {
+        return recoveryUrl;
+    }
+    public void setRecoveryUrl(String recoveryUrl) {
+        this.recoveryUrl = recoveryUrl;
+    }
+
+    // Getter e Setter para shopUrl
+    public String getShopUrl() {
+        return shopUrl;
+    }
+    public void setShopUrl(String shopUrl) {
+        this.shopUrl = shopUrl;
+    }
+
+    // Getter e Setter para status
+    public String getStatus() {
+        return status;
+    }
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    // Getter e Setter para createdAt
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
 }
