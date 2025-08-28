@@ -7,7 +7,9 @@ import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import java.time.Instant; // Adicione este import
 
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -54,5 +56,30 @@ public class AbandonedCheckoutService {
 
         // Espera a transação ser completada e retorna o resultado
         futureTransaction.get();
+    }
+    /**
+     * Encontra checkouts com status "PENDING" criados antes de um tempo específico.
+     * @param time O limite de tempo (ex: tudo criado antes de 30 minutos atrás).
+     * @return Uma lista de documentos de checkout.
+     */
+    public List<QueryDocumentSnapshot> findPendingCheckoutsBefore(Instant time) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        CollectionReference checkouts = db.collection(COLLECTION_NAME);
+
+        Query query = checkouts.whereEqualTo("status", "PENDING")
+                .whereLessThan("createdAt", time);
+
+        return query.get().get().getDocuments();
+    }
+
+    /**
+     * Atualiza o status de um documento de checkout específico.
+     * @param documentId O ID do documento no Firestore.
+     * @param newStatus O novo status a ser definido (ex: "SENT_EMAIL_1").
+     */
+    public void updateCheckoutStatus(String documentId, String newStatus) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        db.collection(COLLECTION_NAME).document(documentId).update("status", newStatus);
+        logger.info("Status do checkout {} atualizado para {}", documentId, newStatus);
     }
 }

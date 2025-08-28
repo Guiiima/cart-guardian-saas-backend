@@ -2,6 +2,7 @@ package com.cartguardian.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CheckoutDTO {
@@ -15,9 +16,13 @@ public class CheckoutDTO {
     @JsonProperty("abandoned_checkout_url")
     private String abandonedCheckoutUrl;
 
-    // Novo campo adicionado - não precisa de @JsonProperty
-    // pois será preenchido a partir do header do webhook.
-    private String shopUrl;
+    @JsonProperty("line_items")
+    private List<LineItemDTO> lineItems; // Lista de produtos
+
+    @JsonProperty("customer")
+    private CustomerDTO customer; // Objeto do cliente
+
+    private String shopUrl; // Campo preenchido pelo header
 
     // Getters e Setters
     public Long getId() {
@@ -44,7 +49,22 @@ public class CheckoutDTO {
         this.abandonedCheckoutUrl = abandonedCheckoutUrl;
     }
 
-    // Getters e Setters para o novo campo
+    public List<LineItemDTO> getLineItems() {
+        return lineItems;
+    }
+
+    public void setLineItems(List<LineItemDTO> lineItems) {
+        this.lineItems = lineItems;
+    }
+
+    public CustomerDTO getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(CustomerDTO customer) {
+        this.customer = customer;
+    }
+
     public String getShopUrl() {
         return shopUrl;
     }

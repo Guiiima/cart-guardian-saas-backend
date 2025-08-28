@@ -52,7 +52,7 @@ public class ShopifyAuthController {
     @GetMapping("/shopify/install")
     public void install(@RequestParam("shop") String shop, HttpServletResponse response) throws IOException {
         String redirectUri = appBaseUrl + "/shopify/callback";
-        String scopes = "read_checkouts, read_orders, write_checkouts, write_orders";
+        String scopes = "read_checkouts, read_orders, write_checkouts, write_orders, read_products";
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;
         response.sendRedirect(installUrl);

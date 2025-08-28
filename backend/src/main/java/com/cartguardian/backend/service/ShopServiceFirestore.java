@@ -11,11 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import com.google.cloud.firestore.QuerySnapshot;       // Adicione este import
+
 import java.util.ArrayList; // Adicione este import
 import java.util.List;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -70,8 +72,10 @@ public class ShopServiceFirestore {
             throw new RuntimeException("Falha na operação com o Firestore", e);
         }
     }
+
     /**
      * Busca e retorna uma lista de todas as lojas salvas na coleção 'shops' do Firestore.
+     *
      * @return Uma lista de objetos Shop.
      */
     public List<Shop> getAllShops() throws ExecutionException, InterruptedException {
@@ -92,5 +96,20 @@ public class ShopServiceFirestore {
 
         logger.info("Total de {} lojas encontradas no Firestore.", shopList.size());
         return shopList;
+    }
+
+    public Optional<Shop> findShopByUrl(String shopUrl) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        Query query = db.collection("shops").whereEqualTo("shopUrl", shopUrl).limit(1);
+
+        ApiFuture<QuerySnapshot> future = query.get();
+        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
+
+        if (!documents.isEmpty()) {
+            Shop shop = documents.get(0).toObject(Shop.class);
+            return Optional.of(shop);
+        }
+
+        return Optional.empty();
     }
 }
