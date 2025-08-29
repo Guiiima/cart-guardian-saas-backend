@@ -11,6 +11,7 @@ public class AbandonedCheckout {
     private String shopUrl;
     private String status;
     private Instant createdAt;
+    private Instant scheduledAt;
 
     public AbandonedCheckout() {}
 
@@ -68,5 +69,13 @@ public class AbandonedCheckout {
     }
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Instant getScheduledAt() {
+        return scheduledAt;
+    }
+
+    public void setScheduledAt(Instant scheduledAt) {
+        this.scheduledAt = scheduledAt;
     }
 }

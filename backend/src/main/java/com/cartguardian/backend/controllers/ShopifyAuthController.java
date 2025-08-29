@@ -1,6 +1,9 @@
 package com.cartguardian.backend.controllers;
 
 import com.cartguardian.backend.dto.ShopifyTokenResponse;
+import com.cartguardian.backend.model.CampanhaRecuperacao;
+import com.cartguardian.backend.model.Shop;
+import com.cartguardian.backend.service.CampanhaRecuperacaoService;
 import com.cartguardian.backend.service.ShopServiceFirestore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +29,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -42,6 +46,8 @@ public class ShopifyAuthController {
     @Value("${app.base-url}")
     private String appBaseUrl;
 
+    @Autowired
+    private CampanhaRecuperacaoService campanhaService;
 
     @Autowired
     private ShopServiceFirestore shopService;
@@ -60,45 +66,64 @@ public class ShopifyAuthController {
 
     @GetMapping("/shopify/callback")
     public String callback(@RequestParam("code") String code,
-                           @RequestParam("shop") String shop,
-                           HttpServletRequest request) throws JsonProcessingException {
-        Map<String, String[]> parameterMap = request.getParameterMap();
+                           @RequestParam("shop") String shopUrl, // Renomeado para clareza
+                           HttpServletRequest request) {
+        try {
+            Map<String, String[]> parameterMap = request.getParameterMap();
 
-        if (!isValidHmac(parameterMap, apiSecret)) {
-            logger.error("HMAC inválido para a loja {}. Abortando.", shop);
-            return "Erro de segurança: HMAC inválido.";
+            if (!isValidHmac(parameterMap, apiSecret)) {
+                logger.error("HMAC inválido para a loja {}. Abortando.", shopUrl);
+                return "Erro de segurança: HMAC inválido.";
+            }
+
+            // 1. Troca o código pelo Access Token
+            String accessTokenUrl = "https://" + shopUrl + "/admin/oauth/access_token";
+            Map<String, String> requestBody = Map.of("client_id", apiKey, "client_secret", apiSecret, "code", code);
+
+            WebClient webClient = WebClient.create();
+            String jsonResponse = webClient.post()
+                    .uri(accessTokenUrl)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            ShopifyTokenResponse tokenResponse = objectMapper.readValue(jsonResponse, ShopifyTokenResponse.class);
+            String accessToken = tokenResponse.getAccessToken();
+            logger.info("Access Token para {} extraído com sucesso.", shopUrl);
+
+            // 2. Salva ou atualiza a loja no Firestore
+            shopService.saveOrUpdateShop(shopUrl, accessToken);
+            logger.info("Loja {} salva/atualizada no banco de dados.", shopUrl);
+
+            // 3. Busca a loja que acabamos de salvar para obter seu ID único do Firestore
+            Optional<Shop> savedShopOpt = shopService.findShopByUrl(shopUrl);
+            if (savedShopOpt.isPresent()) {
+                String lojaId = savedShopOpt.get().getId();
+
+                // 4. Cria e salva a campanha de recuperação padrão para a loja
+                CampanhaRecuperacao campanhaPadrao = new CampanhaRecuperacao();
+                campanhaPadrao.setLojaId(lojaId);
+                campanhaPadrao.setAtiva(true);
+                campanhaPadrao.setTempoEsperaMin(60); // Padrão: 60 minutos
+                campanhaPadrao.setTemplateEmail("d-SEU-ID-DE-TEMPLATE-PADRAO-AQUI");
+
+                campanhaService.saveOrUpdateCampaign(campanhaPadrao);
+                logger.info("Campanha de recuperação padrão criada para a loja ID: {}", lojaId);
+            } else {
+                logger.error("Não foi possível encontrar a loja {} após salvá-la para criar a campanha.", shopUrl);
+            }
+
+            // 5. Registra os webhooks necessários
+            registerCheckoutUpdateWebhook(shopUrl, accessToken);
+
+            return "App instalado e autenticado com sucesso! Token recebido.";
+
+        } catch (Exception e) {
+            logger.error("Ocorreu um erro no fluxo de callback para a loja {}: ", shopUrl, e);
+            return "Ocorreu um erro durante a instalação. Verifique os logs do servidor.";
         }
-
-        String accessTokenUrl = "https://" + shop + "/admin/oauth/access_token";
-
-        Map<String, String> requestBody = Map.of(
-                "client_id", apiKey,
-                "client_secret", apiSecret,
-                "code", code
-        );
-
-        WebClient webClient = WebClient.create();
-        String jsonResponse = webClient.post()
-                .uri(accessTokenUrl)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        logger.info("Resposta da Shopify (contém o access_token): {}", jsonResponse);
-        ShopifyTokenResponse tokenResponse = objectMapper.readValue(jsonResponse, ShopifyTokenResponse.class);
-        String accessToken = tokenResponse.getAccessToken();
-
-        logger.info("Access Token extraído com sucesso: {}", accessToken);
-
-        //shopService.saveOrUpdateShop(shop, accessToken, );
-
-        registerCheckoutUpdateWebhook(shop, accessToken);
-
-        logger.info("Loja salva/atualizada no banco de dados com sucesso!");
-
-        return "App instalado e autenticado com sucesso! Token recebido.";
     }
 
     /**

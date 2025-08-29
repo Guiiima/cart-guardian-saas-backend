@@ -48,7 +48,13 @@ public class CheckoutRecoveryScheduler {
 
         try {
             // 1. Busca os checkouts pendentes no Firestore
-            List<QueryDocumentSnapshot> checkoutsParaProcessar = checkoutService.findPendingCheckoutsBefore(tempoLimite);
+            List<QueryDocumentSnapshot> checkoutsParaProcessar = checkoutService.findPendingCheckoutsToSend();
+            if (checkoutsParaProcessar.isEmpty()) {
+                logger.info("Nenhum e-mail de recuperação para enviar no momento.");
+                return;
+            }
+
+            logger.info("Encontrados {} e-mails de recuperação para enviar.", checkoutsParaProcessar.size());
 
             if (checkoutsParaProcessar.isEmpty()) {
                 logger.info("Nenhum carrinho abandonado para processar.");

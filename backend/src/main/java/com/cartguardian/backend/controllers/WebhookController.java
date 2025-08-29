@@ -1,13 +1,11 @@
 package com.cartguardian.backend.controllers;
 
 import com.cartguardian.backend.dto.CheckoutDTO;
-import com.cartguardian.backend.dto.LineItemDTO; // Certifique-se de que este DTO existe
+import com.cartguardian.backend.dto.LineItemDTO;
 import com.cartguardian.backend.model.AbandonedCheckout;
-import com.cartguardian.backend.model.Shop; // Importe o modelo da loja
-import com.cartguardian.backend.service.AbandonedCheckoutService;
-import com.cartguardian.backend.service.EmailService;
-import com.cartguardian.backend.service.ShopServiceFirestore; // Importe o serviço da loja
-import com.cartguardian.backend.service.ShopifyApiService;
+import com.cartguardian.backend.model.CampanhaRecuperacao;
+import com.cartguardian.backend.model.Shop;
+import com.cartguardian.backend.service.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -49,13 +50,16 @@ public class WebhookController {
     private ShopifyApiService shopifyApiService;
 
     @Autowired
-    private ShopServiceFirestore shopService; // Serviço para buscar dados da loja
+    private ShopServiceFirestore shopService;
+
+    @Autowired
+    private CampanhaRecuperacaoService campanhaService;
 
     @PostMapping("/webhooks/checkouts/update")
     public ResponseEntity<String> handleCheckoutUpdateWebhook(
             @RequestBody String payload,
             @RequestHeader("X-Shopify-Hmac-Sha256") String hmacHeader,
-            @RequestHeader("X-Shopify-Shop-Domain") String shopUrl) { // Nome da variável ajustado
+            @RequestHeader("X-Shopify-Shop-Domain") String shopUrl) {
 
         logger.info("Webhook de 'checkouts/update' recebido da loja: {}", shopUrl);
 
@@ -65,6 +69,7 @@ public class WebhookController {
         }
 
         try {
+            // 1. Mapeia o JSON recebido para o nosso DTO
             CheckoutDTO checkoutData = objectMapper.readValue(payload, CheckoutDTO.class);
 
             if (checkoutData.getEmail() == null || checkoutData.getEmail().isBlank()) {
@@ -81,40 +86,31 @@ public class WebhookController {
             String lojaId = shop.getId();
             String accessToken = shop.getAccessToken();
 
+            Optional<CampanhaRecuperacao> campanhaOpt = campanhaService.findActiveCampaignByLojaId(lojaId);
+            if (campanhaOpt.isEmpty()) {
+                logger.warn("Nenhuma campanha de recuperação ATIVA encontrada para a loja {}. Checkout não será agendado.", shopUrl);
+                return new ResponseEntity<>("Nenhuma campanha ativa.", HttpStatus.OK);
+            }
+            CampanhaRecuperacao campanha = campanhaOpt.get();
+
             AbandonedCheckout checkout = new AbandonedCheckout();
-            checkout.setLojaId(lojaId); // <-- USA O ID IMUTÁVEL AQUI!
+            checkout.setLojaId(lojaId);
             checkout.setShopifyCheckoutId(checkoutData.getId().toString());
             checkout.setCustomerEmail(checkoutData.getEmail());
             checkout.setRecoveryUrl(checkoutData.getAbandonedCheckoutUrl());
-            checkout.setShopUrl(shopUrl); // Guarda a shopUrl também, pode ser útil
+            checkout.setShopUrl(shopUrl);
             checkout.setStatus("PENDING");
             checkout.setCreatedAt(Instant.now());
 
+            long tempoEspera = campanha.getTempoEsperaMin();
+            Instant horarioAgendado = Instant.now().plus(tempoEspera, java.time.temporal.ChronoUnit.MINUTES);
+            checkout.setScheduledAt(horarioAgendado);
+
             abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
 
-            List<EmailService.ItemCarrinho> produtosNoCarrinho = new ArrayList<>();
-            for (LineItemDTO lineItem : checkoutData.getLineItems()) {
-                // Para cada item, busca a URL da sua imagem usando o accessToken
-                String imageUrl = shopifyApiService.getProductImageUrl(shopUrl, accessToken, lineItem.getProductId());
+            logger.info("Checkout {} da loja {} salvo com agendamento para {}.",
+                    checkout.getShopifyCheckoutId(), shopUrl, horarioAgendado);
 
-                produtosNoCarrinho.add(
-                        new EmailService.ItemCarrinho(
-                                imageUrl,
-                                lineItem.getTitle(),
-                                "R$ " + lineItem.getPrice() // Formate o preço como desejar
-                        )
-                );
-            }
-
-//            emailService.enviarEmailDeRecuperacao(
-//                    checkout.getCustomerEmail(),
-//                    checkoutData.getCustomer().getFirstName(),
-//                    checkout.getRecoveryUrl(),
-//                    produtosNoCarrinho,
-//                    shop.getLogoUrl()
-//            );
-
-            logger.info("Checkout abandonado salvo e e-mail enviado para: {}", checkout.getCustomerEmail());
             return new ResponseEntity<>("Webhook processado com sucesso.", HttpStatus.OK);
 
         } catch (Exception e) {

@@ -86,7 +86,20 @@ public class AbandonedCheckoutService {
 
         return query.get().get().getDocuments();
     }
+    /**
+     * Encontra checkouts com status "PENDING" cujo horário agendado de envio já passou.
+     * @return Uma lista de documentos de checkout prontos para serem processados.
+     */
+    public List<QueryDocumentSnapshot> findPendingCheckoutsToSend() throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        CollectionReference checkouts = db.collection(COLLECTION_NAME);
 
+        // A consulta agora filtra por 'scheduledAt' em vez de 'createdAt'
+        Query query = checkouts.whereEqualTo("status", "PENDING")
+                .whereLessThanOrEqualTo("scheduledAt", Instant.now());
+
+        return query.get().get().getDocuments();
+    }
     /**
      * Atualiza o status de um documento de checkout específico.
      *
