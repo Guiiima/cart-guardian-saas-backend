@@ -1,5 +1,6 @@
 # Arquivo de configuração sensível
 application.properties
+teste-8367f-firebase-adminsdk-fbsvc-36c0117a9b.json
 
 # Arquivos de ajuda
 HELP.md
@@ -15,6 +16,7 @@ build/
 .apt_generated
 .classpath
 .factorypath
+
 .project
 .settings
 .springBeans

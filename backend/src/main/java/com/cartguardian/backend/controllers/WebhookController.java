@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -101,7 +102,7 @@ public class WebhookController {
             checkout.setShopUrl(shopUrl);
             checkout.setStatus("PENDING");
             checkout.setCreatedAt(Instant.now());
-
+            checkout.setTotalPrice(checkoutData.getTotalPrice());
             long tempoEspera = campanha.getTempoEsperaMin();
             Instant horarioAgendado = Instant.now().plus(tempoEspera, java.time.temporal.ChronoUnit.MINUTES);
             checkout.setScheduledAt(horarioAgendado);

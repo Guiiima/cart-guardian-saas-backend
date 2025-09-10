@@ -20,7 +20,7 @@ public class CampanhaRecuperacaoController {
     private CampanhaRecuperacaoService campanhaService;
 
     @Autowired
-    private ShopServiceFirestore shopService; // Precisamos dele para encontrar a loja
+    private ShopServiceFirestore shopService;
 
     /**
      * Endpoint para o frontend carregar a campanha da loja autenticada.
@@ -28,8 +28,6 @@ public class CampanhaRecuperacaoController {
     @GetMapping("/minha-campanha")
     public ResponseEntity<?> getMinhaCampanha() {
         try {
-            // EM PRODUÇÃO: O 'shopUrl' viria de um token JWT validado.
-            // Por enquanto, para facilitar os testes, vamos usar um valor fixo.
             // TODO: Substituir pela lógica de autenticação real para obter o shopUrl do usuário logado.
             String shopUrl = "cartguard.myshopify.com";
 
@@ -41,7 +39,6 @@ public class CampanhaRecuperacaoController {
             String lojaId = shopOpt.get().getId();
             Optional<CampanhaRecuperacao> campanhaOpt = campanhaService.findActiveCampaignByLojaId(lojaId);
 
-            // Se a campanha foi encontrada, retorna os dados. Se não, retorna 'Não Encontrado' (404).
             return campanhaOpt.map(ResponseEntity::ok)
                     .orElseGet(() -> ResponseEntity.notFound().build());
 

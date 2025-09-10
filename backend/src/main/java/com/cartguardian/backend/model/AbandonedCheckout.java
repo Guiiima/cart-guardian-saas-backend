@@ -1,10 +1,10 @@
 package com.cartguardian.backend.model;
-
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public class AbandonedCheckout {
 
-    private String lojaId; // "Chave estrangeira" para o documento da loja
+    private String lojaId;
     private String shopifyCheckoutId;
     private String customerEmail;
     private String recoveryUrl;
@@ -12,6 +12,9 @@ public class AbandonedCheckout {
     private String status;
     private Instant createdAt;
     private Instant scheduledAt;
+    private BigDecimal totalPrice; // Para calcular a receita
+    private Instant sentAt;        // Para saber quando o e-mail foi enviado
+    private Instant recoveredAt;   // Para saber quando o carrinho foi recuperado
 
     public AbandonedCheckout() {}
 
@@ -78,4 +81,11 @@ public class AbandonedCheckout {
     public void setScheduledAt(Instant scheduledAt) {
         this.scheduledAt = scheduledAt;
     }
+    public BigDecimal getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(BigDecimal totalPrice) { this.totalPrice = totalPrice; }
+    public Instant getSentAt() { return sentAt; }
+    public void setSentAt(Instant sentAt) { this.sentAt = sentAt; }
+    public Instant getRecoveredAt() { return recoveredAt; }
+    public void setRecoveredAt(Instant recoveredAt) { this.recoveredAt = recoveredAt; }
+
 }

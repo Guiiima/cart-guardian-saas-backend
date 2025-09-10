@@ -2,6 +2,8 @@ package com.cartguardian.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.math.BigDecimal;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -17,12 +19,17 @@ public class CheckoutDTO {
     private String abandonedCheckoutUrl;
 
     @JsonProperty("line_items")
-    private List<LineItemDTO> lineItems; // Lista de produtos
+    private List<LineItemDTO> lineItems;
 
     @JsonProperty("customer")
-    private CustomerDTO customer; // Objeto do cliente
+    private CustomerDTO customer;
 
-    private String shopUrl; // Campo preenchido pelo header
+    // Anotação adicionada para mapear o JSON
+    @JsonProperty("total_price")
+    private BigDecimal totalPrice;
+
+    // Campo preenchido manualmente pelo header
+    private String shopUrl;
 
     // Getters e Setters
     public Long getId() {
@@ -71,5 +78,13 @@ public class CheckoutDTO {
 
     public void setShopUrl(String shopUrl) {
         this.shopUrl = shopUrl;
+    }
+
+    public BigDecimal getTotalPrice() {
+        return totalPrice;
+    }
+
+    public void setTotalPrice(BigDecimal totalPrice) {
+        this.totalPrice = totalPrice;
     }
 }

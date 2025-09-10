@@ -93,7 +93,7 @@ public class CheckoutRecoveryScheduler {
                     );
 
                     // 3. ATUALIZA O STATUS - PASSO CRÍTICO!
-                    //checkoutService.updateCheckoutStatus(documentId, "SENT_EMAIL_1");
+                    //checkoutService.updateCheckoutStatusAndSentDate(documentId, "SENT_EMAIL_1");
 
                 } catch (Exception e) {
                     logger.error("Falha ao processar o checkout com ID: {}", documentId, e);
