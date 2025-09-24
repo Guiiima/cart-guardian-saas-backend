@@ -57,7 +57,8 @@ public class ShopifyAuthController {
     @GetMapping("/shopify/install")
     public void install(@RequestParam("shop") String shop, HttpServletResponse response) throws IOException {
         String redirectUri = appBaseUrl + "/shopify/callback";
-        String scopes = "read_checkouts, read_orders, write_checkouts, write_orders, read_products, write_customers";
+        // Adicionado o escopo 'read_orders' para o novo webhook
+        String scopes = "read_checkouts, read_orders, write_checkouts, write_orders, read_products";
         String installUrl = "https://" + shop + "/admin/oauth/authorize?client_id=" + apiKey +
                 "&scope=" + scopes + "&redirect_uri=" + redirectUri;
         response.sendRedirect(installUrl);
@@ -65,7 +66,7 @@ public class ShopifyAuthController {
 
     @GetMapping("/shopify/callback")
     public String callback(@RequestParam("code") String code,
-                           @RequestParam("shop") String shopUrl, // Renomeado para clareza
+                           @RequestParam("shop") String shopUrl,
                            HttpServletRequest request) {
         try {
             Map<String, String[]> parameterMap = request.getParameterMap();
@@ -91,20 +92,17 @@ public class ShopifyAuthController {
             String accessToken = tokenResponse.getAccessToken();
             logger.info("Access Token para {} extraído com sucesso.", shopUrl);
 
-
             shopService.saveOrUpdateShop(shopUrl, accessToken);
             logger.info("Loja {} salva/atualizada no banco de dados.", shopUrl);
-
 
             Optional<Shop> savedShopOpt = shopService.findShopByUrl(shopUrl);
             if (savedShopOpt.isPresent()) {
                 String lojaId = savedShopOpt.get().getId();
 
-
                 CampanhaRecuperacao campanhaPadrao = new CampanhaRecuperacao();
                 campanhaPadrao.setLojaId(lojaId);
                 campanhaPadrao.setAtiva(true);
-                campanhaPadrao.setTempoEsperaMin(60); // Padrão: 60 minutos
+                campanhaPadrao.setTempoEsperaMin(60);
                 campanhaPadrao.setTemplateEmail("d-SEU-ID-DE-TEMPLATE-PADRAO-AQUI");
 
                 campanhaService.saveOrUpdateCampaign(campanhaPadrao);
@@ -113,8 +111,7 @@ public class ShopifyAuthController {
                 logger.error("Não foi possível encontrar a loja {} após salvá-la para criar a campanha.", shopUrl);
             }
 
-
-            registerCheckoutUpdateWebhook(shopUrl, accessToken);
+            registerAllWebhooks(shopUrl, accessToken);
 
             return "App instalado e autenticado com sucesso! Token recebido.";
 
@@ -125,17 +122,24 @@ public class ShopifyAuthController {
     }
 
     /**
-     * Registra o webhook para o tópico 'checkouts/create' na API da Shopify.
+     * Orquestra o registro de todos os webhooks necessários para a aplicação.
      */
-    private void registerCheckoutUpdateWebhook(String shopUrl, String accessToken) {
-        String webhookEndpoint = appBaseUrl + "/webhooks/checkouts/update";
+    private void registerAllWebhooks(String shopUrl, String accessToken) {
+        logger.info("Registrando webhooks para a loja {}...", shopUrl);
+        registerWebhook(shopUrl, accessToken, "checkouts/update", "/webhooks/checkouts/update");
+        registerWebhook(shopUrl, accessToken, "orders/create", "/webhooks/orders/create");
+    }
 
+    /**
+     * Método auxiliar genérico para registrar um único webhook.
+     */
+    private void registerWebhook(String shopUrl, String accessToken, String topic, String endpointPath) {
+        String webhookEndpoint = appBaseUrl + endpointPath;
         String shopifyApiUrl = "https://" + shopUrl + "/admin/api/2024-07/webhooks.json";
-
 
         Map<String, Object> webhookPayload = Map.of(
                 "webhook", Map.of(
-                        "topic", "checkouts/update",
+                        "topic", topic,
                         "address", webhookEndpoint,
                         "format", "json"
                 )
@@ -149,21 +153,24 @@ public class ShopifyAuthController {
                     .header("X-Shopify-Access-Token", accessToken)
                     .bodyValue(webhookPayload)
                     .retrieve()
-
                     .onStatus(
                             status -> status.is4xxClientError() || status.is5xxServerError(),
                             clientResponse -> clientResponse.bodyToMono(String.class)
                                     .flatMap(errorBody -> {
-                                        logger.error("Erro da API da Shopify: Status {} | Corpo: {}", clientResponse.statusCode(), errorBody);
+                                        if (clientResponse.statusCode().value() == 422) {
+                                            logger.info("Webhook para o tópico '{}' já existe para a loja {}.", topic, shopUrl);
+                                        } else {
+                                            logger.error("Erro da API da Shopify: Status {} | Corpo: {}", clientResponse.statusCode(), errorBody);
+                                        }
                                         return Mono.error(new RuntimeException("Erro da API da Shopify: " + clientResponse.statusCode()));
                                     })
                     )
                     .bodyToMono(String.class)
                     .block();
 
-            logger.info("Resposta do registro de webhook: {}", response);
+            logger.info("Resposta do registro de webhook para o tópico '{}': {}", topic, response);
         } catch (Exception e) {
-            logger.error("Falha ao registrar o webhook: {}", e.getMessage());
+            logger.warn("Falha ao registrar o webhook para o tópico '{}'. Isso pode ser esperado se ele já existir.", topic);
         }
     }
 

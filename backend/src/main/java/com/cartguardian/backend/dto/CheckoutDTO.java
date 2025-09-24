@@ -24,14 +24,14 @@ public class CheckoutDTO {
     @JsonProperty("customer")
     private CustomerDTO customer;
 
-    // Anotação adicionada para mapear o JSON
+    @JsonProperty("token")
+    private String checkoutToken;
+
     @JsonProperty("total_price")
     private BigDecimal totalPrice;
 
-    // Campo preenchido manualmente pelo header
     private String shopUrl;
 
-    // Getters e Setters
     public Long getId() {
         return id;
     }
@@ -72,12 +72,12 @@ public class CheckoutDTO {
         this.customer = customer;
     }
 
-    public String getShopUrl() {
-        return shopUrl;
+    public String getCheckoutToken() {
+        return checkoutToken;
     }
 
-    public void setShopUrl(String shopUrl) {
-        this.shopUrl = shopUrl;
+    public void setCheckoutToken(String checkoutToken) {
+        this.checkoutToken = checkoutToken;
     }
 
     public BigDecimal getTotalPrice() {
@@ -86,5 +86,13 @@ public class CheckoutDTO {
 
     public void setTotalPrice(BigDecimal totalPrice) {
         this.totalPrice = totalPrice;
+    }
+
+    public String getShopUrl() {
+        return shopUrl;
+    }
+
+    public void setShopUrl(String shopUrl) {
+        this.shopUrl = shopUrl;
     }
 }

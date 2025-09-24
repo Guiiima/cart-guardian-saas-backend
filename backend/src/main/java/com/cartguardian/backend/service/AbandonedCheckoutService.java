@@ -107,4 +107,27 @@ public class AbandonedCheckoutService {
 
         logger.info("Status do checkout {} atualizado para {} e data de envio registrada.", documentId, newStatus);
     }
+    /**
+     * Encontra um carrinho abandonado pelo seu checkout_token e o marca como recuperado.
+     * @param checkoutToken O token que conecta o carrinho ao pedido.
+     */
+    public void markAsRecovered(String checkoutToken) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+
+        Query query = db.collection(COLLECTION_NAME).whereEqualTo("checkoutToken", checkoutToken).limit(1);
+        List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
+
+        if (!documents.isEmpty()) {
+            String documentId = documents.get(0).getId();
+            logger.info("Carrinho abandonado com checkoutToken {} encontrado (ID: {}). Marcando como RECUPERADO.", checkoutToken, documentId);
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("status", "RECOVERED");
+            updates.put("recoveredAt", Instant.now());
+
+            db.collection(COLLECTION_NAME).document(documentId).update(updates);
+        } else {
+            logger.info("Pedido criado para o checkoutToken {}, mas nenhum carrinho abandonado correspondente foi encontrado.", checkoutToken);
+        }
+    }
 }

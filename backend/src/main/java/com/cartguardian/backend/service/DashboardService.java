@@ -29,7 +29,9 @@ public class DashboardService {
     private static final ZoneId ZONE_ID = ZoneId.of("America/Sao_Paulo");
 
     public CombinedDashboardDataDTO getCombinedDashboardData(String lojaId, String metric, String periodo) throws ExecutionException, InterruptedException {
-        Instant startTime = Instant.now().minus(365, ChronoUnit.DAYS);
+        ZonedDateTime agoraEmUtc = ZonedDateTime.now(ZoneOffset.UTC);
+        ZonedDateTime umAnoAtras = agoraEmUtc.minusYears(1);
+        Instant startTime = umAnoAtras.toInstant();
         List<AbandonedCheckout> allRelevantCheckouts = fetchAllCheckouts(lojaId, startTime);
 
         DashboardMetricsDTO dailyKPIs = calculateDailyKPIs(allRelevantCheckouts);
