@@ -18,6 +18,7 @@ public class AbandonedCheckout {
     private BigDecimal totalPrice;
     private Instant sentAt;
     private Instant recoveredAt;
+    private String checkoutToken;
     private List<Map<String, Object>> lineItems;
 
     public AbandonedCheckout() {}
@@ -116,5 +117,12 @@ public class AbandonedCheckout {
 
     public void setLineItems(List<Map<String, Object>> lineItems) {
         this.lineItems = lineItems;
+    }
+    public String getCheckoutToken() {
+        return checkoutToken;
+    }
+
+    public void setCheckoutToken(String checkoutToken) {
+        this.checkoutToken = checkoutToken;
     }
 }

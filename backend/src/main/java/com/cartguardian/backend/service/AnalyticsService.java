@@ -54,8 +54,11 @@ public class AnalyticsService {
                         dto.setStatus("Pendente");
                         break;
                     case "SENT_EMAIL_1":
-                    default:
+                        dto.setStatus("Em Recuperação");
+                    case "FAILED":
                         dto.setStatus("Falhou");
+                    default:
+                        dto.setStatus("Desconhecido");
                         break;
                 }
                 resultadoFinal.add(dto);

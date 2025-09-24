@@ -29,32 +29,17 @@ public class DashboardService {
     private static final ZoneId ZONE_ID = ZoneId.of("America/Sao_Paulo");
 
     public CombinedDashboardDataDTO getCombinedDashboardData(String lojaId, String metric, String periodo) throws ExecutionException, InterruptedException {
-        ZonedDateTime agoraEmUtc = ZonedDateTime.now(ZoneOffset.UTC);
-        ZonedDateTime umAnoAtras = agoraEmUtc.minusYears(1);
-        Instant startTime = umAnoAtras.toInstant();
-        List<AbandonedCheckout> allRelevantCheckouts = fetchAllCheckouts(lojaId, startTime);
+        Instant oneYearAgo = Instant.now().minus(365, ChronoUnit.DAYS);
+        List<AbandonedCheckout> allCheckouts = fetchAllCheckouts(lojaId, oneYearAgo);
 
-        DashboardMetricsDTO dailyKPIs = calculateDailyKPIs(allRelevantCheckouts);
-        ChartDataDTO chartData = generateChartData(allRelevantCheckouts, metric, periodo);
+        DashboardMetricsDTO dailyKPIs = calculateDailyKPIs(allCheckouts);
+        ChartDataDTO chartData = generateChartData(allCheckouts, metric, periodo);
 
         CombinedDashboardDataDTO response = new CombinedDashboardDataDTO();
         response.setKpisDiarios(dailyKPIs);
         response.setDadosDoGrafico(chartData);
 
         return response;
-    }
-
-    private List<AbandonedCheckout> fetchRelevantCheckouts(String lojaId, Instant startTime) throws ExecutionException, InterruptedException {
-        Firestore db = FirestoreClient.getFirestore();
-        Query query = db.collection(CHECKOUTS_COLLECTION)
-                .whereEqualTo("lojaId", lojaId)
-                .whereIn("status", List.of("SENT_EMAIL_1", "RECOVERED"))
-                .whereGreaterThanOrEqualTo("sentAt", startTime);
-
-        List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
-        return documents.stream()
-                .map(doc -> doc.toObject(AbandonedCheckout.class))
-                .collect(Collectors.toList());
     }
 
     private List<AbandonedCheckout> fetchAllCheckouts(String lojaId, Instant startTime) throws ExecutionException, InterruptedException {
@@ -73,22 +58,54 @@ public class DashboardService {
         LocalDate today = LocalDate.now(ZONE_ID);
 
         List<AbandonedCheckout> abandonedToday = checkouts.stream()
-                .filter(c -> c.getCreatedAt() != null && c.getCreatedAt().atZone(ZONE_ID).toLocalDate().equals(today))
+                .filter(c -> c.getCreatedAt() != null
+                        && c.getCreatedAt().atZone(ZONE_ID).toLocalDate().equals(today))
                 .toList();
+        long abandonedCount = abandonedToday.size();
 
         List<AbandonedCheckout> recoveredToday = checkouts.stream()
-                .filter(c -> "RECOVERED".equals(c.getStatus()) && c.getRecoveredAt() != null && c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().equals(today))
+                .filter(c -> "RECOVERED".equals(c.getStatus())
+                        && c.getRecoveredAt() != null
+                        && c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().equals(today))
                 .toList();
-
-        long abandonedCount = abandonedToday.size();
         long recoveredCount = recoveredToday.size();
 
+        long attemptedTodayCount = checkouts.stream()
+                .filter(c ->
+                        (c.getSentAt() != null
+                                && c.getSentAt().atZone(ZONE_ID).toLocalDate().equals(today))
+                                || "FAILED".equals(c.getStatus())
+                                || "SENT_EMAIL_1".equals(c.getStatus())
+                                || ("RECOVERED".equals(c.getStatus())
+                                && c.getRecoveredAt() != null
+                                && c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().equals(today))
+                )
+                .count();
+
+        long notRecoveredCount = attemptedTodayCount - recoveredCount;
+
         BigDecimal recoveredRevenue = recoveredToday.stream()
-                .map(AbandonedCheckout::getTotalPrice).filter(Objects::nonNull)
+                .map(AbandonedCheckout::getTotalPrice)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return getMetricsDTO(abandonedCount, recoveredCount, recoveredRevenue);
+        double conversionRate = (recoveredCount + notRecoveredCount > 0)
+                ? ((double) recoveredCount / (recoveredCount + notRecoveredCount)) * 100
+                : 0.0;
+
+        BigDecimal averageTicket = (recoveredCount > 0)
+                ? recoveredRevenue.divide(new BigDecimal(recoveredCount), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        DashboardMetricsDTO dto = new DashboardMetricsDTO();
+        dto.setReceitaRecuperada(recoveredRevenue);
+        dto.setTaxaDeConversao(conversionRate);
+        dto.setCarrinhosAbandonados(abandonedCount);
+        dto.setTicketMedioRecuperado(averageTicket);
+
+        return dto;
     }
+
 
     @NotNull
     private static DashboardMetricsDTO getMetricsDTO(long abandonedCount, long recoveredCount, BigDecimal recoveredRevenue) {

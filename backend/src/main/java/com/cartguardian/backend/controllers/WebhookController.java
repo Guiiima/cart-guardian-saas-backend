@@ -166,6 +166,7 @@ public class WebhookController {
         checkout.setStatus("PENDING");
         checkout.setCreatedAt(Instant.now());
         checkout.setTotalPrice(checkoutData.getTotalPrice());
+        checkout.setCheckoutToken(checkoutData.getCheckoutToken());
 
         Instant scheduledAt = Instant.now().plus(campanha.getTempoEsperaMin(), java.time.temporal.ChronoUnit.MINUTES);
         checkout.setScheduledAt(scheduledAt);

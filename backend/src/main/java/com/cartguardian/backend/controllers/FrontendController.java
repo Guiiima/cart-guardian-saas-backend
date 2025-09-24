@@ -18,8 +18,8 @@ public class FrontendController {
     public String handleAppEntry(@RequestParam(name = "shop", required = false) String shop) throws ExecutionException, InterruptedException {
 
         if (shop != null && !shop.isEmpty()) {
-            //boolean isShopInstalled = shopService.findShopByUrl(shop).isPresent();
-            boolean isShopInstalled = false;
+            boolean isShopInstalled = shopService.findShopByUrl(shop).isPresent();
+            //boolean isShopInstalled = false;
 
             if (isShopInstalled) {
                 return "forward:/index.html";

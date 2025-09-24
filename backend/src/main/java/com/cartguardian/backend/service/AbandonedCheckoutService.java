@@ -130,4 +130,27 @@ public class AbandonedCheckoutService {
             logger.info("Pedido criado para o checkoutToken {}, mas nenhum carrinho abandonado correspondente foi encontrado.", checkoutToken);
         }
     }
+    /**
+     * Encontra carrinhos que tiveram um e-mail enviado há um certo tempo e não foram recuperados.
+     * @param threshold O tempo limite (ex: tudo enviado antes de 48 horas atrás).
+     * @return Uma lista de documentos de checkouts não convertidos.
+     */
+    public List<QueryDocumentSnapshot> findUnconvertedCheckouts(Instant threshold) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        Query query = db.collection(COLLECTION_NAME)
+                .whereEqualTo("status", "SENT_EMAIL_1")
+                .whereLessThan("sentAt", threshold);
+
+        return query.get().get().getDocuments();
+    }
+
+    /**
+     * Atualiza o status de um documento para FAILED.
+     * @param documentId O ID do documento no Firestore.
+     */
+    public void markAsFailed(String documentId) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        db.collection(COLLECTION_NAME).document(documentId).update("status", "FAILED");
+        logger.info("Status do checkout {} atualizado para FAILED.", documentId);
+    }
 }
