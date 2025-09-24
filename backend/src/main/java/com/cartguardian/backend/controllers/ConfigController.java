@@ -22,10 +22,6 @@ public class ConfigController {
      */
     @GetMapping("/api/config")
     public ResponseEntity<?> getAppConfig(@RequestParam("host") String host) {
-        // TODO: Você pode adicionar uma camada de segurança aqui para garantir
-        // que esta requisição só possa ser feita por uma sessão válida.
-
-        // Retorna os dados como um JSON
         Map<String, String> config = Map.of(
                 "apiKey", shopifyApiKey,
                 "host", host

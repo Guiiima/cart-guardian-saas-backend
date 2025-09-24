@@ -25,7 +25,6 @@ public class EmailService {
     @Value("${sendgrid.api.key}")
     private String sendGridApiKey;
 
-    // Classe auxiliar interna para representar um item no carrinho
     public static class ItemCarrinho {
         private final String imageUrl;
         private final String productName;
@@ -37,7 +36,6 @@ public class EmailService {
             this.price = price;
         }
 
-        // Getters são necessários para a serialização JSON
         public String getImage_url() { return imageUrl; }
         public String getProduct_name() { return productName; }
         public String getPrice() { return price; }
@@ -54,19 +52,19 @@ public class EmailService {
      */
     public void enviarEmailDeRecuperacao(String paraEmail, String nomeCliente, String urlRecuperacao, List<ItemCarrinho> itens, String logoUrl) throws IOException {
         Mail mail = new Mail();
-        mail.setFrom(new Email("gh26062003@gmail.com", "Aelin"));
+        mail.setFrom(new Email("gh26062003@gmail.com", nomeCliente));
         mail.setSubject("Você esqueceu algo no seu carrinho!");
 
-        // 1. Cria o objeto de personalização para o destinatário
+
         Personalization personalization = new Personalization();
         personalization.addTo(new Email(paraEmail));
 
-        // 2. Adiciona os dados dinâmicos que o template espera
+
         personalization.addDynamicTemplateData("nome_cliente", nomeCliente);
         personalization.addDynamicTemplateData("url_recuperacao", urlRecuperacao);
-        personalization.addDynamicTemplateData("logo_url", logoUrl); // <-- LINHA CORRIGIDA
+        personalization.addDynamicTemplateData("logo_url", logoUrl);
 
-        // Converte a lista de objetos ItemCarrinho para uma lista de Mapas
+
         List<Map<String, String>> itemsAsMaps = itens.stream()
                 .map(item -> Map.of(
                         "image_url", item.getImage_url(),
@@ -79,7 +77,7 @@ public class EmailService {
 
         mail.addPersonalization(personalization);
 
-        // 3. Define o ID do Template Dinâmico
+
         mail.setTemplateId("d-b8669694186f41c8adbf6aac2661e0c4");
 
         SendGrid sg = new SendGrid(sendGridApiKey);

@@ -27,19 +27,16 @@ public class DashboardController {
             @RequestParam("periodo") String periodo) {
         try {
             // TODO: Obter o lojaId da sessão do usuário autenticado.
-            String lojaId = "NhsJfFVmgAC6bHl6KImM"; // Valor fixo para teste
+            String lojaId = "mSjwqbSJ2BdtZgZESPbn"; // Valor fixo para teste
 
             CombinedDashboardDataDTO responseData = dashboardService.getCombinedDashboardData(lojaId, metric, periodo);
             return ResponseEntity.ok(responseData);
 
         } catch (IllegalArgumentException e) {
-            // Este 'catch' é útil para tratar casos onde 'metric' ou 'periodo' são inválidos
             logger.warn("Tentativa de busca com parâmetros inválidos: metric={}, periodo={}", metric, periodo);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Parâmetros 'metric' ou 'periodo' inválidos.");
-
         } catch (Exception e) {
-            // Log de erro mais detalhado
             logger.error("Erro fatal ao buscar métricas do dashboard: metric={}, periodo={}", metric, periodo, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Ocorreu um erro inesperado ao buscar as métricas.");

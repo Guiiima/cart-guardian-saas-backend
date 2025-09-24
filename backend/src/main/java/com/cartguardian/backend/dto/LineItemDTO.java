@@ -15,7 +15,9 @@ public class LineItemDTO {
     @JsonProperty("price")
     private String price;
 
-    // Getters e Setters
+    @JsonProperty("quantity")
+    private Integer quantity;
+
     public Long getProductId() {
         return productId;
     }
@@ -38,5 +40,13 @@ public class LineItemDTO {
 
     public void setPrice(String price) {
         this.price = price;
+    }
+
+    public Integer getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
     }
 }

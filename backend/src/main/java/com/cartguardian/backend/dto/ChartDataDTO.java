@@ -8,19 +8,16 @@ import java.util.List;
  */
 public class ChartDataDTO {
 
-    private List<String> labels; // Rótulos para o eixo X do gráfico (ex: "Jan", "Fev", "Mar")
-    private List<Double> data;   // Valores para o eixo Y do gráfico (ex: 1200.50, 1554.96)
+    private List<String> labels;
+    private List<Double> data;
 
-    // Construtor vazio
+
     public ChartDataDTO() {
     }
 
-    // Getters e Setters
     public List<String> getLabels() {
         return labels;
     }
-
-
 
     public void setLabels(List<String> labels) {
         this.labels = labels;

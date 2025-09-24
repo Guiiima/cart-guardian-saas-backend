@@ -9,7 +9,7 @@ public class CustomerDTO {
     @JsonProperty("first_name")
     private String firstName;
 
-    // Getters e Setters
+
     public String getFirstName() {
         return firstName;
     }

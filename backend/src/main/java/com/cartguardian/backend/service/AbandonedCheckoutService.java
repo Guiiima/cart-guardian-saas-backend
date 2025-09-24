@@ -23,6 +23,7 @@ public class AbandonedCheckoutService {
     /**
      * Salva um checkout no Firestore usando uma transação para garantir que não haja duplicatas,
      * mesmo com múltiplas requisições simultâneas.
+     *
      * @param checkout O objeto AbandonedCheckout a ser salvo.
      * @return O ID do novo documento criado, ou null se o checkout já existia.
      */
@@ -53,9 +54,27 @@ public class AbandonedCheckoutService {
         return futureTransaction.get();
     }
 
+    public String saveCheckout(AbandonedCheckout checkout)
+            throws ExecutionException, InterruptedException {
+
+        Firestore db = FirestoreClient.getFirestore();
+
+        String documentId = checkout.getShopifyCheckoutId();
+        DocumentReference docRef = db.collection(COLLECTION_NAME).document(documentId);
+
+        ApiFuture<WriteResult> writeResult = docRef.set(checkout);
+
+        writeResult.get();
+
+        logger.info("Checkout {} salvo/atualizado com ID: {}", documentId, documentId);
+
+        return documentId;
+    }
+
     /**
      * Encontra checkouts com status "PENDING" cujo horário agendado de envio já passou.
      * Usado pelo CheckoutRecoveryScheduler.
+     *
      * @return Uma lista de documentos de checkout prontos para serem processados.
      */
     public List<QueryDocumentSnapshot> findPendingCheckoutsToSend() throws ExecutionException, InterruptedException {
@@ -71,8 +90,9 @@ public class AbandonedCheckoutService {
     /**
      * Atualiza o status de um checkout e registra a data/hora do envio do e-mail.
      * Usado pelo CheckoutRecoveryScheduler após enviar um e-mail.
+     *
      * @param documentId O ID do documento no Firestore.
-     * @param newStatus O novo status a ser definido (ex: "SENT_EMAIL_1").
+     * @param newStatus  O novo status a ser definido (ex: "SENT_EMAIL_1").
      */
     public void updateCheckoutStatusAndSentDate(String documentId, String newStatus) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();

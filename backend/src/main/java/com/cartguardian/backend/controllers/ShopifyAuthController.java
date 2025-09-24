@@ -5,7 +5,6 @@ import com.cartguardian.backend.model.CampanhaRecuperacao;
 import com.cartguardian.backend.model.Shop;
 import com.cartguardian.backend.service.CampanhaRecuperacaoService;
 import com.cartguardian.backend.service.ShopServiceFirestore;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -76,7 +75,6 @@ public class ShopifyAuthController {
                 return "Erro de segurança: HMAC inválido.";
             }
 
-            // 1. Troca o código pelo Access Token
             String accessTokenUrl = "https://" + shopUrl + "/admin/oauth/access_token";
             Map<String, String> requestBody = Map.of("client_id", apiKey, "client_secret", apiSecret, "code", code);
 
@@ -93,16 +91,16 @@ public class ShopifyAuthController {
             String accessToken = tokenResponse.getAccessToken();
             logger.info("Access Token para {} extraído com sucesso.", shopUrl);
 
-            // 2. Salva ou atualiza a loja no Firestore
+
             shopService.saveOrUpdateShop(shopUrl, accessToken);
             logger.info("Loja {} salva/atualizada no banco de dados.", shopUrl);
 
-            // 3. Busca a loja que acabamos de salvar para obter seu ID único do Firestore
+
             Optional<Shop> savedShopOpt = shopService.findShopByUrl(shopUrl);
             if (savedShopOpt.isPresent()) {
                 String lojaId = savedShopOpt.get().getId();
 
-                // 4. Cria e salva a campanha de recuperação padrão para a loja
+
                 CampanhaRecuperacao campanhaPadrao = new CampanhaRecuperacao();
                 campanhaPadrao.setLojaId(lojaId);
                 campanhaPadrao.setAtiva(true);
@@ -115,7 +113,7 @@ public class ShopifyAuthController {
                 logger.error("Não foi possível encontrar a loja {} após salvá-la para criar a campanha.", shopUrl);
             }
 
-            // 5. Registra os webhooks necessários
+
             registerCheckoutUpdateWebhook(shopUrl, accessToken);
 
             return "App instalado e autenticado com sucesso! Token recebido.";

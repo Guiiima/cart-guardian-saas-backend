@@ -14,8 +14,8 @@ import java.util.concurrent.ExecutionException;
 import com.google.cloud.firestore.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.HashMap; // Adicione este import
-import java.util.Map; // Adicione este import
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class CampanhaRecuperacaoService {
@@ -30,23 +30,19 @@ public class CampanhaRecuperacaoService {
      */
     public Optional<CampanhaRecuperacao> findActiveCampaignByLojaId(String lojaId) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();
-
-        // Cria a consulta para buscar a campanha pela ID da loja e que esteja ativa
         Query query = db.collection(COLLECTION_NAME)
                 .whereEqualTo("lojaId", lojaId)
                 .whereEqualTo("ativa", true)
-                .limit(1); // Limita a 1, pois deve haver apenas uma campanha ativa por loja
+                .limit(1);
 
         ApiFuture<QuerySnapshot> future = query.get();
         List<QueryDocumentSnapshot> documents = future.get().getDocuments();
 
         if (!documents.isEmpty()) {
-            // Se encontrou, converte o primeiro documento para o nosso objeto e retorna
             CampanhaRecuperacao campanha = documents.get(0).toObject(CampanhaRecuperacao.class);
             return Optional.of(campanha);
         }
 
-        // Se não encontrou nenhuma campanha ativa para a loja
         return Optional.empty();
     }
     /**
@@ -74,7 +70,6 @@ public class CampanhaRecuperacaoService {
             updates.put("templateEmail", campanha.getTemplateEmail());
             updates.put("tempoEsperaMin", campanha.getTempoEsperaMin());
 
-            // Usa o método .update() para alterar apenas os campos especificados
             future = docRef.update(updates);
 
         } else {

@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public class DashboardMetricsDTO {
     private BigDecimal receitaRecuperada;
     private double taxaDeConversao;
-    private long emailsEnviados;
+    private long carrinhosAbandonados;
     private BigDecimal ticketMedioRecuperado;
 
     public BigDecimal getReceitaRecuperada() {
@@ -24,12 +24,12 @@ public class DashboardMetricsDTO {
         this.taxaDeConversao = taxaDeConversao;
     }
 
-    public long getEmailsEnviados() {
-        return emailsEnviados;
+    public long getCarrinhosAbandonados() {
+        return carrinhosAbandonados;
     }
 
-    public void setEmailsEnviados(long emailsEnviados) {
-        this.emailsEnviados = emailsEnviados;
+    public void setCarrinhosAbandonados(long carrinhosAbandonados) {
+        this.carrinhosAbandonados = carrinhosAbandonados;
     }
 
     public BigDecimal getTicketMedioRecuperado() {

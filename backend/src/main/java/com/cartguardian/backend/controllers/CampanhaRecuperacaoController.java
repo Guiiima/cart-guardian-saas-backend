@@ -55,9 +55,6 @@ public class CampanhaRecuperacaoController {
     @PostMapping
     public ResponseEntity<?> salvarCampanha(@RequestBody CampanhaRecuperacao campanha) {
         try {
-            // TODO: Adicionar validação de segurança para garantir que o usuário
-            // só pode modificar a campanha da sua própria loja.
-
             String campanhaId = campanhaService.saveOrUpdateCampaign(campanha);
             return ResponseEntity.ok(Map.of("message", "Campanha salva com sucesso!", "id", campanhaId));
         } catch (Exception e) {

@@ -1,19 +1,9 @@
 package com.cartguardian.backend.service;
 
-import com.cartguardian.backend.model.Shop;
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.Query;
-import com.google.cloud.firestore.QueryDocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
-import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import com.fasterxml.jackson.databind.JsonNode; // Importante
+import com.fasterxml.jackson.databind.JsonNode;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class ShopifyApiService {
@@ -50,7 +40,6 @@ public class ShopifyApiService {
             System.err.println("Erro ao buscar imagem do produto " + productId + ": " + e.getMessage());
         }
 
-        // Retorna uma URL de placeholder se a imagem não for encontrada
         return "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png";
     }
 }

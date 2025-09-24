@@ -1,11 +1,11 @@
 package com.cartguardian.backend.controllers;
 
 import com.cartguardian.backend.dto.CheckoutDTO;
-import com.cartguardian.backend.dto.LineItemDTO;
 import com.cartguardian.backend.model.AbandonedCheckout;
 import com.cartguardian.backend.model.CampanhaRecuperacao;
 import com.cartguardian.backend.model.Shop;
 import com.cartguardian.backend.service.*;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,15 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @RestController
 public class WebhookController {
@@ -70,7 +66,6 @@ public class WebhookController {
         }
 
         try {
-            // 1. Mapeia o JSON recebido para o nosso DTO
             CheckoutDTO checkoutData = objectMapper.readValue(payload, CheckoutDTO.class);
 
             if (checkoutData.getEmail() == null || checkoutData.getEmail().isBlank()) {
@@ -104,13 +99,14 @@ public class WebhookController {
             checkout.setCreatedAt(Instant.now());
             checkout.setTotalPrice(checkoutData.getTotalPrice());
             long tempoEspera = campanha.getTempoEsperaMin();
-            Instant horarioAgendado = Instant.now().plus(tempoEspera, java.time.temporal.ChronoUnit.MINUTES);
-            checkout.setScheduledAt(horarioAgendado);
-
-            abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
+            Instant Agenda = Instant.now().plus(tempoEspera, java.time.temporal.ChronoUnit.MINUTES);
+            checkout.setScheduledAt(Agenda);
+            TypeReference<List<Map<String, Object>>> typeRef = new TypeReference<>() {};
+            checkout.setLineItems(objectMapper.convertValue(checkoutData.getLineItems(), typeRef));
+            abandonedCheckoutService.saveCheckout(checkout);
 
             logger.info("Checkout {} da loja {} salvo com agendamento para {}.",
-                    checkout.getShopifyCheckoutId(), shopUrl, horarioAgendado);
+                    checkout.getShopifyCheckoutId(), shopUrl, Agenda);
 
             return new ResponseEntity<>("Webhook processado com sucesso.", HttpStatus.OK);
 

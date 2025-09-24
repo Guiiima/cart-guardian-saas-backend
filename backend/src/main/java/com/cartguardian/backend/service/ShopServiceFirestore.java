@@ -16,31 +16,28 @@ public class ShopServiceFirestore {
 
     private static final String COLLECTION_NAME = "shops";
 
-    // O método saveOrUpdateShop agora não precisa retornar nada.
+
     public void saveOrUpdateShop(String shopUrl, String accessToken) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();
         Query query = db.collection(COLLECTION_NAME).whereEqualTo("shopUrl", shopUrl).limit(1);
         List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
 
         if (!documents.isEmpty()) {
-            // Se a loja existe, atualiza o token
             DocumentReference docRef = documents.get(0).getReference();
             docRef.update("accessToken", accessToken, "active", true);
-            // Poderia adicionar lógica para atualizar a logo aqui também
+
         } else {
-            // Se a loja não existe, cria um novo documento
             Shop newShop = new Shop();
             newShop.setShopUrl(shopUrl);
             newShop.setAccessToken(accessToken);
             newShop.setActive(true);
             newShop.setInstalledAt(Instant.now());
-            // Aqui você faria a chamada à API da Shopify para pegar a logo e setar: newShop.setLogoUrl(...)
+
 
             db.collection(COLLECTION_NAME).add(newShop);
         }
     }
 
-    // Este método agora retorna o objeto Shop completo, incluindo seu ID
     public Optional<Shop> findShopByUrl(String shopUrl) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();
         Query query = db.collection(COLLECTION_NAME).whereEqualTo("shopUrl", shopUrl).limit(1);
@@ -51,7 +48,7 @@ public class ShopServiceFirestore {
         if (!documents.isEmpty()) {
             QueryDocumentSnapshot doc = documents.get(0);
             Shop shop = doc.toObject(Shop.class);
-            shop.setId(doc.getId()); // <-- Pega o ID do documento e coloca no objeto!
+            shop.setId(doc.getId());
             return Optional.of(shop);
         }
 
