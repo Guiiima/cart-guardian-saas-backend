@@ -1,23 +1,27 @@
 package com.cartguardian.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 
 public class Shop {
 
-    private String id; // ID do documento no Firestore
+    private String id;
     private String shopUrl;
     private String accessToken;
+
+    @JsonIgnore
+    private String apiSecret;
+
     private boolean active;
     private Instant installedAt;
     private String logoUrl;
 
     public Shop() {}
 
-    // Getter e Setter para o ID
+    public String getApiSecret() { return apiSecret; }
+    public void setApiSecret(String apiSecret) { this.apiSecret = apiSecret; }
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-
-    // ... outros getters e setters ...
     public String getShopUrl() { return shopUrl; }
     public void setShopUrl(String shopUrl) { this.shopUrl = shopUrl; }
     public String getAccessToken() { return accessToken; }

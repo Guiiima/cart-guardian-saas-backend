@@ -76,7 +76,7 @@ public class CheckoutRecoveryScheduler {
                             shop.getLogoUrl()
                     );
 
-                    checkoutService.updateCheckoutStatusAndSentDate(documentId, "SENT_EMAIL_1");
+                    checkoutService.updateCheckoutStatusAndSentDate(documentId, "PENDING");
 
                 } catch (Exception e) {
                     logger.error("Falha ao processar o checkout com ID: {}", documentId, e);

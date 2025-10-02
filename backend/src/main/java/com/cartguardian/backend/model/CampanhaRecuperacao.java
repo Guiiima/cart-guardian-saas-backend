@@ -42,4 +42,5 @@ public class CampanhaRecuperacao {
     public void setTempoEsperaMin(long tempoEsperaMin) {
         this.tempoEsperaMin = tempoEsperaMin;
     }
+
 }

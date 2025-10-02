@@ -46,21 +46,14 @@ public class AnalyticsService {
                 dto.setId(item.get("product_id").toString());
                 dto.setProduto((String) item.get("title"));
 
-                switch (checkout.getStatus()) {
-                    case "RECOVERED":
-                        dto.setStatus("Recuperado");
-                        break;
-                    case "PENDING":
-                        dto.setStatus("Pendente");
-                        break;
-                    case "SENT_EMAIL_1":
-                        dto.setStatus("Em Recuperação");
-                    case "FAILED":
-                        dto.setStatus("Falhou");
-                    default:
-                        dto.setStatus("Desconhecido");
-                        break;
-                }
+                String status = switch (checkout.getStatus()) {
+                    case "RECOVERED" -> "Recuperado";
+                    case "PENDING" -> "Pendente";
+                    case "SENT_EMAIL_1" -> "Em Recuperação";
+                    case "FAILED" -> "Falhou";
+                    default -> "teste";
+                };
+                dto.setStatus(status);
                 resultadoFinal.add(dto);
             }
         }

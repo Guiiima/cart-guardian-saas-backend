@@ -124,6 +124,7 @@ public class DashboardService {
     private ChartDataDTO generateChartData(List<AbandonedCheckout> allCheckouts, String metric, String periodoStr) {
         LocalDate endDate = LocalDate.now(ZONE_ID);
         LocalDate startDate;
+
         Function<LocalDate, String> groupByFormatter = switch (periodoStr.toUpperCase()) {
             case "SEMANAL" -> {
                 startDate = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
@@ -139,89 +140,105 @@ public class DashboardService {
             }
         };
 
-        Map<String, Double> groupedData = new TreeMap<>(Comparator.comparing(this::labelSorter));
-
         Map<String, Double> finalGroupedData = new LinkedHashMap<>();
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
             finalGroupedData.put(groupByFormatter.apply(currentDate), 0.0);
-            if (periodoStr.equalsIgnoreCase("ANUAL")) {
-                currentDate = currentDate.plusMonths(1);
-            } else {
-                currentDate = currentDate.plusDays(1);
-            }
+            currentDate = periodoStr.equalsIgnoreCase("ANUAL") ? currentDate.plusMonths(1) : currentDate.plusDays(1);
         }
 
-
-        switch (metric.toLowerCase()) {
-            case "receita":
-                groupedData = allCheckouts.stream()
-                        .filter(c -> "RECOVERED".equals(c.getStatus()) && c.getRecoveredAt() != null && c.getTotalPrice() != null &&
-                                !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+        Map<String, Function<List<AbandonedCheckout>, Map<String, Double>>> metricFunctions = Map.of(
+                "receita", checkouts -> checkouts.stream()
+                        .filter(c -> "RECOVERED".equals(c.getStatus())
+                                && c.getRecoveredAt() != null
+                                && c.getTotalPrice() != null
+                                && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
                         .collect(Collectors.groupingBy(
                                 c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
                                 Collectors.summingDouble(c -> c.getTotalPrice().doubleValue())
-                        ));
-                break;
+                        )),
 
-            case "abandonados":
-                groupedData = allCheckouts.stream()
-                        .filter(c -> c.getCreatedAt() != null &&
-                                !c.getCreatedAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+                "abandonados", checkouts -> checkouts.stream()
+                        .filter(c -> c.getCreatedAt() != null
+                                && !c.getCreatedAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
                         .collect(Collectors.groupingBy(
                                 c -> groupByFormatter.apply(c.getCreatedAt().atZone(ZONE_ID).toLocalDate()),
                                 TreeMap::new,
                                 Collectors.collectingAndThen(Collectors.counting(), Long::doubleValue)
-                        ));
-                break;
+                        )),
 
-            case "conversao":
-                Map<String, Long> sentByPeriod = allCheckouts.stream()
-                        .filter(c -> c.getSentAt() != null && !c.getSentAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
-                        .collect(Collectors.groupingBy(
-                                c -> groupByFormatter.apply(c.getSentAt().atZone(ZONE_ID).toLocalDate()),
-                                Collectors.counting()
-                        ));
+                "conversao", checkouts -> {
+                    Map<String, Long> actionTakenByPeriod = checkouts.stream()
+                            .filter(c -> (c.getSentAt() != null || "FAILED".equals(c.getStatus()) || "SENT_EMAIL_1".equals(c.getStatus()) || "RECOVERED".equals(c.getStatus()))
+                                    && ((c.getSentAt() != null && !c.getSentAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+                                    || ("FAILED".equals(c.getStatus()) || "SENT_EMAIL_1".equals(c.getStatus()) || "RECOVERED".equals(c.getStatus()))))
+                            .collect(Collectors.groupingBy(
+                                    c -> {
+                                        if (c.getRecoveredAt() != null) return groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate());
+                                        else if (c.getSentAt() != null) return groupByFormatter.apply(c.getSentAt().atZone(ZONE_ID).toLocalDate());
+                                        else return groupByFormatter.apply(c.getCreatedAt().atZone(ZONE_ID).toLocalDate());
+                                    },
+                                    Collectors.counting()
+                            ));
 
-                Map<String, Long> recoveredByPeriod = allCheckouts.stream()
-                        .filter(c -> "RECOVERED".equals(c.getStatus()) && c.getRecoveredAt() != null && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
-                        .collect(Collectors.groupingBy(
-                                c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
-                                Collectors.counting()
-                        ));
+                    Map<String, Long> recoveredByPeriod = checkouts.stream()
+                            .filter(c -> "RECOVERED".equals(c.getStatus())
+                                    && c.getRecoveredAt() != null
+                                    && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+                            .collect(Collectors.groupingBy(
+                                    c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
+                                    Collectors.counting()
+                            ));
 
-                Map<String, Double> finalGroupedData2 = groupedData;
-                sentByPeriod.forEach((label, sentCount) -> {
-                    long recoveredCount = recoveredByPeriod.getOrDefault(label, 0L);
-                    double conversion = (sentCount > 0) ? ((double) recoveredCount / sentCount) * 100 : 0.0;
-                    finalGroupedData2.put(label, conversion);
-                });
-                break;
+                    return actionTakenByPeriod.entrySet().stream()
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey,
+                                    e -> {
+                                        long recoveredCount = recoveredByPeriod.getOrDefault(e.getKey(), 0L);
+                                        return (e.getValue() > 0) ? ((double) recoveredCount / e.getValue()) * 100 : 0.0;
+                                    }
+                            ));
+                },
 
-            case "ticket":
-                Map<String, BigDecimal> revenueByPeriod = allCheckouts.stream()
-                        .filter(c -> "RECOVERED".equals(c.getStatus()) && c.getRecoveredAt() != null && c.getTotalPrice() != null && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
-                        .collect(Collectors.groupingBy(
-                                c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
-                                Collectors.mapping(AbandonedCheckout::getTotalPrice, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
-                        ));
 
-                Map<String, Long> recoveredCountByPeriod = allCheckouts.stream()
-                        .filter(c -> "RECOVERED".equals(c.getStatus()) && c.getRecoveredAt() != null && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
-                        .collect(Collectors.groupingBy(
-                                c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
-                                Collectors.counting()
-                        ));
+                "ticket", checkouts -> {
+                    Map<String, BigDecimal> revenueByPeriod = checkouts.stream()
+                            .filter(c -> "RECOVERED".equals(c.getStatus())
+                                    && c.getRecoveredAt() != null
+                                    && c.getTotalPrice() != null
+                                    && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+                            .collect(Collectors.groupingBy(
+                                    c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
+                                    Collectors.mapping(AbandonedCheckout::getTotalPrice,
+                                            Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
+                            ));
 
-                Map<String, Double> finalGroupedData1 = groupedData;
-                revenueByPeriod.forEach((label, totalRevenue) -> {
-                    long recoveredCount = recoveredCountByPeriod.getOrDefault(label, 0L);
-                    BigDecimal averageTicket = (recoveredCount > 0) ?
-                            totalRevenue.divide(new BigDecimal(recoveredCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-                    finalGroupedData1.put(label, averageTicket.doubleValue());
-                });
-                break;
-        }
+                    Map<String, Long> recoveredCountByPeriod = checkouts.stream()
+                            .filter(c -> "RECOVERED".equals(c.getStatus())
+                                    && c.getRecoveredAt() != null
+                                    && !c.getRecoveredAt().atZone(ZONE_ID).toLocalDate().isBefore(startDate))
+                            .collect(Collectors.groupingBy(
+                                    c -> groupByFormatter.apply(c.getRecoveredAt().atZone(ZONE_ID).toLocalDate()),
+                                    Collectors.counting()
+                            ));
+
+                    return revenueByPeriod.entrySet().stream()
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey,
+                                    e -> {
+                                        long count = recoveredCountByPeriod.getOrDefault(e.getKey(), 0L);
+                                        BigDecimal avg = (count > 0)
+                                                ? e.getValue().divide(new BigDecimal(count), 2, RoundingMode.HALF_UP)
+                                                : BigDecimal.ZERO;
+                                        return avg.doubleValue();
+                                    }
+                            ));
+                }
+        );
+
+        Map<String, Double> groupedData = metricFunctions
+                .getOrDefault(metric.toLowerCase(), c -> new HashMap<>())
+                .apply(allCheckouts);
 
         finalGroupedData.putAll(groupedData);
 
@@ -230,6 +247,7 @@ public class DashboardService {
         chartData.setData(new ArrayList<>(finalGroupedData.values()));
         return chartData;
     }
+
 
     private Integer labelSorter(String label) {
         try {

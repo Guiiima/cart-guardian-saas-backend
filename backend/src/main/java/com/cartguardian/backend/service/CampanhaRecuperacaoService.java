@@ -8,12 +8,15 @@ import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
 import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+
 import com.google.cloud.firestore.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,7 +27,33 @@ public class CampanhaRecuperacaoService {
     private static final String COLLECTION_NAME = "campanhasRecuperacao";
 
     /**
+     * Busca a campanha principal de uma loja, independentemente do status (ativa ou não).
+     * Usado pela tela de configurações do frontend.
+     *
+     * @param lojaId O ID da loja.
+     * @return Um Optional contendo a campanha se encontrada.
+     */
+    public Optional<CampanhaRecuperacao> findCampaignByLojaId(String lojaId) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+
+        Query query = db.collection(COLLECTION_NAME)
+                .whereEqualTo("lojaId", lojaId)
+                .limit(1);
+
+        ApiFuture<QuerySnapshot> future = query.get();
+        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
+
+        if (!documents.isEmpty()) {
+            CampanhaRecuperacao campanha = documents.get(0).toObject(CampanhaRecuperacao.class);
+            return Optional.of(campanha);
+        }
+
+        return Optional.empty();
+    }
+
+    /**
      * Busca a campanha de recuperação ativa para uma loja específica.
+     *
      * @param lojaId O ID do documento da loja (da coleção 'lojas').
      * @return Um Optional contendo a campanha se encontrada, ou vazio se não.
      */
@@ -45,10 +74,12 @@ public class CampanhaRecuperacaoService {
 
         return Optional.empty();
     }
+
     /**
      * Salva uma nova campanha ou atualiza uma existente.
      * Se a campanha já existir (baseado no lojaId), atualiza apenas os campos
      * 'ativa', 'templateEmail' e 'tempoEsperaMin', preservando o 'lojaId' original.
+     *
      * @param campanha O objeto CampanhaRecuperacao com os dados.
      * @return O ID do documento salvo ou atualizado.
      */
@@ -67,7 +98,7 @@ public class CampanhaRecuperacaoService {
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("ativa", campanha.isAtiva());
-            updates.put("templateEmail", campanha.getTemplateEmail());
+            //updates.put("templateEmail", campanha.getTemplateEmail());
             updates.put("tempoEsperaMin", campanha.getTempoEsperaMin());
 
             future = docRef.update(updates);
@@ -83,5 +114,26 @@ public class CampanhaRecuperacaoService {
         logger.info("Campanha salva/atualizada com sucesso! Update time: {}", result.getUpdateTime());
 
         return docRef.getId();
+    }
+
+    /**
+     * Atualiza apenas o ID do template de e-mail da campanha ativa de uma loja.
+     *
+     * @param lojaId        O ID da loja.
+     * @param newTemplateId O novo ID do template do SendGrid.
+     */
+    public void updateTemplateId(String lojaId, String newTemplateId) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+
+        Query query = db.collection(COLLECTION_NAME).whereEqualTo("lojaId", lojaId).whereEqualTo("ativa", true).limit(1);
+        List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
+
+        if (!documents.isEmpty()) {
+            String documentId = documents.get(0).getId();
+            db.collection(COLLECTION_NAME).document(documentId).update("templateEmail", newTemplateId).get(); // .get() espera a conclusão
+            logger.info("Template da campanha para a loja {} (doc ID: {}) atualizado para {}.", lojaId, documentId, newTemplateId);
+        } else {
+            throw new IllegalStateException("Nenhuma campanha ativa encontrada para a loja " + lojaId + " para atualizar o template.");
+        }
     }
 }

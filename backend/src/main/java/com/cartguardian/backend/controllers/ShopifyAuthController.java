@@ -92,7 +92,7 @@ public class ShopifyAuthController {
             String accessToken = tokenResponse.getAccessToken();
             logger.info("Access Token para {} extraído com sucesso.", shopUrl);
 
-            shopService.saveOrUpdateShop(shopUrl, accessToken);
+            shopService.saveOrUpdateShop(shopUrl, accessToken, this.apiSecret);
             logger.info("Loja {} salva/atualizada no banco de dados.", shopUrl);
 
             Optional<Shop> savedShopOpt = shopService.findShopByUrl(shopUrl);
@@ -103,7 +103,7 @@ public class ShopifyAuthController {
                 campanhaPadrao.setLojaId(lojaId);
                 campanhaPadrao.setAtiva(true);
                 campanhaPadrao.setTempoEsperaMin(60);
-                campanhaPadrao.setTemplateEmail("d-SEU-ID-DE-TEMPLATE-PADRAO-AQUI");
+                campanhaPadrao.setTemplateEmail("d-b8669694186f41c8adbf6aac2661e0c4");
 
                 campanhaService.saveOrUpdateCampaign(campanhaPadrao);
                 logger.info("Campanha de recuperação padrão criada para a loja ID: {}", lojaId);

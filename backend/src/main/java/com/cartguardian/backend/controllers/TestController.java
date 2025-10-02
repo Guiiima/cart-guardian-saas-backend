@@ -90,7 +90,7 @@ public class TestController {
                     checkout.setSentAt(sentAt);
                     checkout.setRecoveredAt(recoveredAt);
 
-                    checkoutService.saveCheckoutIfNotExists(checkout);
+                    checkoutService.saveOrUpdateCheckoutWithRules(checkout);
                     checkoutsCreated++;
                 }
             }
@@ -147,7 +147,7 @@ public class TestController {
                 checkout.setSentAt(sentAt);
                 checkout.setRecoveredAt(recoveredAt);
 
-                checkoutService.saveCheckoutIfNotExists(checkout);
+                checkoutService.saveOrUpdateCheckoutWithRules(checkout);
                 checkoutsCreated++;
             }
 
@@ -204,7 +204,7 @@ public class TestController {
                 checkout.setSentAt(sentAt);
                 checkout.setRecoveredAt(recoveredAt);
 
-                checkoutService.saveCheckoutIfNotExists(checkout);
+                checkoutService.saveOrUpdateCheckoutWithRules(checkout);
                 checkoutsCreated++;
             }
 

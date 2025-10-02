@@ -20,14 +20,18 @@ public class AbandonedCheckoutService {
     private static final Logger logger = LoggerFactory.getLogger(AbandonedCheckoutService.class);
     private static final String COLLECTION_NAME = "carrinhosAbandonados";
 
+
+
     /**
-     * Salva um checkout no Firestore usando uma transação para garantir que não haja duplicatas,
-     * mesmo com múltiplas requisições simultâneas.
+     * Salva ou atualiza um checkout no Firestore com regras de negócio específicas.
+     * - Se não existir, cria um novo.
+     * - Se existir e o status for 'FAILED', cria um novo (re-abandono).
+     * - Se existir e o status NÃO for 'FAILED', atualiza o existente com os novos dados.
      *
-     * @param checkout O objeto AbandonedCheckout a ser salvo.
-     * @return O ID do novo documento criado, ou null se o checkout já existia.
+     * @param checkout O objeto AbandonedCheckout com os dados mais recentes.
+     * @return O ID do documento criado ou atualizado.
      */
-    public String saveCheckoutIfNotExists(AbandonedCheckout checkout) throws ExecutionException, InterruptedException {
+    public String saveOrUpdateCheckoutWithRules(AbandonedCheckout checkout) throws ExecutionException, InterruptedException {
         Firestore db = FirestoreClient.getFirestore();
 
         Query query = db.collection(COLLECTION_NAME)
@@ -40,37 +44,31 @@ public class AbandonedCheckoutService {
             if (snapshot.isEmpty()) {
                 DocumentReference newCheckoutRef = db.collection(COLLECTION_NAME).document();
                 transaction.set(newCheckoutRef, checkout);
-                logger.info("Novo checkout abandonado {} sendo salvo com ID: {}",
+                logger.info("Novo checkout abandonado {} salvo com ID: {}",
                         checkout.getShopifyCheckoutId(), newCheckoutRef.getId());
                 return newCheckoutRef.getId();
             } else {
-                String existingId = snapshot.getDocuments().get(0).getId();
-                logger.warn("Transação cancelada. Checkout duplicado. ShopifyCheckoutId: {} já existe no documento ID: {}",
-                        checkout.getShopifyCheckoutId(), existingId);
-                return null;
+                QueryDocumentSnapshot existingDoc = snapshot.getDocuments().get(0);
+                String existingStatus = existingDoc.getString("status");
+
+                if ("FAILED".equals(existingStatus)) {
+                    DocumentReference newCheckoutRef = db.collection(COLLECTION_NAME).document();
+                    transaction.set(newCheckoutRef, checkout);
+                    logger.info("Checkout {} re-abandonado (status anterior era FAILED). Criando novo registro com ID: {}",
+                            checkout.getShopifyCheckoutId(), newCheckoutRef.getId());
+                    return newCheckoutRef.getId();
+                } else {
+                    DocumentReference existingCheckoutRef = existingDoc.getReference();
+                    transaction.set(existingCheckoutRef, checkout);
+                    logger.info("Checkout existente {} (ID: {}) atualizado com novos dados.",
+                            checkout.getShopifyCheckoutId(), existingCheckoutRef.getId());
+                    return existingCheckoutRef.getId();
+                }
             }
         });
 
         return futureTransaction.get();
     }
-
-    public String saveCheckout(AbandonedCheckout checkout)
-            throws ExecutionException, InterruptedException {
-
-        Firestore db = FirestoreClient.getFirestore();
-
-        String documentId = checkout.getShopifyCheckoutId();
-        DocumentReference docRef = db.collection(COLLECTION_NAME).document(documentId);
-
-        ApiFuture<WriteResult> writeResult = docRef.set(checkout);
-
-        writeResult.get();
-
-        logger.info("Checkout {} salvo/atualizado com ID: {}", documentId, documentId);
-
-        return documentId;
-    }
-
     /**
      * Encontra checkouts com status "PENDING" cujo horário agendado de envio já passou.
      * Usado pelo CheckoutRecoveryScheduler.

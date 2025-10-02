@@ -78,7 +78,7 @@ public class EmailService {
         mail.addPersonalization(personalization);
 
 
-        mail.setTemplateId("d-b8669694186f41c8adbf6aac2661e0c4");
+        mail.setTemplateId("d-8fbd711045fb4f63ab851beda397f2c3");
 
         SendGrid sg = new SendGrid(sendGridApiKey);
         Request request = new Request();

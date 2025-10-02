@@ -19,7 +19,7 @@ import java.io.InputStream;
 public class FirebaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
-    private static final String FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "seu-arquivo-de-credenciais.json";
+    private static final String FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "teste-8367f-firebase-adminsdk-fbsvc-36c0117a9b.json";
 
     /**
      * Cria um bean do tipo FirebaseApp, garantindo que o SDK seja inicializado
@@ -30,12 +30,10 @@ public class FirebaseConfig {
     @Bean
     public FirebaseApp initializeFirebase() {
         try {
-            // Verifica se já existe uma instância do FirebaseApp para evitar reinicialização.
             if (FirebaseApp.getApps().isEmpty()) {
                 logger.info("Inicializando Firebase Admin SDK...");
 
-                // Carrega o arquivo de credenciais da pasta 'resources'.
-                ClassPathResource resource = new ClassPathResource("teste-8367f-firebase-adminsdk-fbsvc-36c0117a9b.json");
+                ClassPathResource resource = new ClassPathResource(FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
                 InputStream serviceAccount = resource.getInputStream();
 
                 FirebaseOptions options = FirebaseOptions.builder()
@@ -48,12 +46,10 @@ public class FirebaseConfig {
                 logger.info("Firebase Admin SDK já foi inicializado.");
             }
         } catch (IOException e) {
-            // Lança uma exceção em tempo de execução se o arquivo de credenciais não for encontrado.
             logger.error("Erro ao inicializar o Firebase Admin SDK: {}", e.getMessage());
             throw new RuntimeException("Não foi possível inicializar o Firebase. Verifique o arquivo de credenciais.", e);
         }
 
-        // Retorna a instância padrão do FirebaseApp.
         return FirebaseApp.getInstance();
     }
 }

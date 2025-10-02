@@ -31,7 +31,7 @@ import java.util.Map;
 @RequestMapping("/webhooks")
 public class WebhookController {
 
-    private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
+    private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
 
     private final String apiSecret;
     private final ObjectMapper objectMapper;
@@ -49,6 +49,7 @@ public class WebhookController {
             ShopifyApiService shopifyApiService,
             ShopServiceFirestore shopService,
             CampanhaRecuperacaoService campanhaService) {
+
         this.apiSecret = apiSecret;
         this.objectMapper = objectMapper;
         this.abandonedCheckoutService = abandonedCheckoutService;
@@ -59,84 +60,80 @@ public class WebhookController {
     }
 
     @PostMapping("/checkouts/update")
-    public ResponseEntity<String> handleCheckoutUpdateWebhook(
+    public ResponseEntity<Map<String, String>> handleCheckoutUpdateWebhook(
             @RequestBody String payload,
             @RequestHeader("X-Shopify-Hmac-Sha256") String hmacHeader,
             @RequestHeader("X-Shopify-Shop-Domain") String shopUrl) {
 
-        logger.info("Webhook de 'checkouts/update' recebido da loja: {}", shopUrl);
+        log.info("Webhook de 'checkouts/update' recebido da loja: {}", shopUrl);
         validateWebhook(payload, hmacHeader, shopUrl);
 
         try {
             CheckoutDTO checkoutData = objectMapper.readValue(payload, CheckoutDTO.class);
 
             if (checkoutData.getEmail() == null || checkoutData.getEmail().isBlank()) {
-                logger.info("Ignorando checkout sem e-mail para a loja {}.", shopUrl);
-                return ResponseEntity.ok("E-mail ausente. Ignorado.");
+                log.info("Ignorando checkout sem e-mail para a loja {}.", shopUrl);
+                return ResponseEntity.ok(Map.of("message", "E-mail ausente. Ignorado."));
             }
 
             Shop shop = shopService.findShopByUrl(shopUrl)
                     .orElseThrow(() -> {
-                        logger.error("Loja {} não encontrada em nosso banco de dados.", shopUrl);
+                        log.error("Loja {} não encontrada.", shopUrl);
                         return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Loja não registrada");
                     });
 
-            CampanhaRecuperacao campanha = campanhaService.findActiveCampaignByLojaId(shop.getId())
-                    .orElseGet(() -> {
-                        logger.warn("Nenhuma campanha ativa encontrada para a loja {}.", shopUrl);
-                        return null;
-                    });
-
-            if (campanha == null) {
-                return ResponseEntity.ok("Nenhuma campanha ativa.");
+            var campanhaOpt = campanhaService.findActiveCampaignByLojaId(shop.getId());
+            if (campanhaOpt.isEmpty()) {
+                log.warn("Nenhuma campanha ativa encontrada para a loja {}.", shopUrl);
+                return ResponseEntity.ok(Map.of("message", "Nenhuma campanha ativa."));
             }
 
-            AbandonedCheckout checkout = buildAbandonedCheckout(checkoutData, shop, shopUrl, campanha);
-            abandonedCheckoutService.saveCheckoutIfNotExists(checkout);
+            AbandonedCheckout checkout = buildAbandonedCheckout(checkoutData, shop, shopUrl, campanhaOpt.get());
+            abandonedCheckoutService.saveOrUpdateCheckoutWithRules(checkout);
 
-            logger.info("Checkout {} da loja {} salvo com agendamento para {}.",
+            log.info("Checkout {} da loja {} salvo com agendamento para {}.",
                     checkout.getShopifyCheckoutId(), shopUrl, checkout.getScheduledAt());
 
-            return ResponseEntity.ok("Webhook processado com sucesso.");
+            return ResponseEntity.ok(Map.of("message", "Webhook processado com sucesso."));
 
         } catch (Exception e) {
-            logger.error("Erro ao processar webhook da loja {}: ", shopUrl, e);
+            log.error("Erro ao processar webhook da loja {}: ", shopUrl, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro no processamento.");
+                    .body(Map.of("error", "Erro no processamento."));
         }
     }
 
     @PostMapping("/orders/create")
-    public ResponseEntity<String> handleOrderCreateWebhook(
+    public ResponseEntity<Map<String, String>> handleOrderCreateWebhook(
             @RequestBody String payload,
             @RequestHeader("X-Shopify-Hmac-Sha256") String hmacHeader,
             @RequestHeader("X-Shopify-Shop-Domain") String shopUrl) {
 
-        logger.info("Webhook de 'orders/create' recebido da loja: {}", shopUrl);
+        log.info("Webhook de 'orders/create' recebido da loja: {}", shopUrl);
         validateWebhook(payload, hmacHeader, shopUrl);
 
         try {
             ShopifyOrderDTO orderData = objectMapper.readValue(payload, ShopifyOrderDTO.class);
-            String checkoutToken = orderData.getCheckoutToken();
 
-            if (checkoutToken != null && !checkoutToken.isEmpty()) {
+            String checkoutToken = orderData.getCheckoutToken();
+            if (checkoutToken != null && !checkoutToken.isBlank()) {
                 abandonedCheckoutService.markAsRecovered(checkoutToken);
             }
 
-            return ResponseEntity.ok("Webhook de pedido recebido.");
+            return ResponseEntity.ok(Map.of("message", "Webhook de pedido recebido."));
 
         } catch (Exception e) {
-            logger.error("Erro ao processar webhook de pedido da loja {}: ", shopUrl, e);
+            log.error("Erro ao processar webhook de pedido da loja {}: ", shopUrl, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erro no processamento.");
+                    .body(Map.of("error", "Erro no processamento."));
         }
     }
 
-    // ----------------- MÉTODOS PRIVADOS -----------------
+    // ---------------- MÉTODOS PRIVADOS ----------------
 
     private void validateWebhook(String payload, String hmacHeader, String shopUrl) {
         if (!isWebhookValid(payload, hmacHeader)) {
-            logger.error("ERRO: HMAC do webhook da loja {} é inválido.", shopUrl);
+            log.error("HMAC inválido para a loja {}.", shopUrl);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "HMAC inválido");
         }
     }
@@ -144,14 +141,13 @@ public class WebhookController {
     private boolean isWebhookValid(String payload, String hmacHeader) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKeySpec = new SecretKeySpec(apiSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(secretKeySpec);
+            mac.init(new SecretKeySpec(apiSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] hmacBytes = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             String calculatedHmac = Base64.getEncoder().encodeToString(hmacBytes);
             return MessageDigest.isEqual(calculatedHmac.getBytes(StandardCharsets.UTF_8),
                     hmacHeader.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            logger.error("Erro ao validar HMAC: ", e);
+            log.error("Erro ao validar HMAC: ", e);
             return false;
         }
     }
@@ -168,8 +164,7 @@ public class WebhookController {
         checkout.setTotalPrice(checkoutData.getTotalPrice());
         checkout.setCheckoutToken(checkoutData.getCheckoutToken());
 
-        Instant scheduledAt = Instant.now().plus(campanha.getTempoEsperaMin(), java.time.temporal.ChronoUnit.MINUTES);
-        checkout.setScheduledAt(scheduledAt);
+        checkout.setScheduledAt(Instant.now().plus(campanha.getTempoEsperaMin(), java.time.temporal.ChronoUnit.MINUTES));
 
         TypeReference<List<Map<String, Object>>> typeRef = new TypeReference<>() {};
         checkout.setLineItems(objectMapper.convertValue(checkoutData.getLineItems(), typeRef));
