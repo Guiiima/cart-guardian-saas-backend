@@ -41,6 +41,7 @@ public class EmailService {
         public String getPrice() { return price; }
     }
 
+
     /**
      * Envia um e-mail de recuperação de carrinho usando um Template Dinâmico do SendGrid.
      * @param paraEmail O e-mail do destinatário.
@@ -48,22 +49,20 @@ public class EmailService {
      * @param urlRecuperacao O link direto para o carrinho abandonado.
      * @param itens A lista de produtos que estavam no carrinho.
      * @param logoUrl A URL da logo da loja.
+     * @param templateId O ID do Template Dinâmico do SendGrid a ser usado. // <-- NOVO PARÂMETRO
      * @throws IOException Se ocorrer um erro na comunicação com a API do SendGrid.
      */
-    public void enviarEmailDeRecuperacao(String paraEmail, String nomeCliente, String urlRecuperacao, List<ItemCarrinho> itens, String logoUrl) throws IOException {
+    public void enviarEmailDeRecuperacao(String paraEmail, String nomeCliente, String urlRecuperacao, List<ItemCarrinho> itens, String logoUrl, String templateId) throws IOException {
         Mail mail = new Mail();
-        mail.setFrom(new Email("gh26062003@gmail.com", nomeCliente));
-        mail.setSubject("Você esqueceu algo no seu carrinho!");
-
+        mail.setFrom(new Email("gh26062003@gmail.com", "Nome da Sua Loja")); // Pode usar o nome do cliente ou da loja aqui
 
         Personalization personalization = new Personalization();
         personalization.addTo(new Email(paraEmail));
 
-
+        // Dados dinâmicos para o template
         personalization.addDynamicTemplateData("nome_cliente", nomeCliente);
         personalization.addDynamicTemplateData("url_recuperacao", urlRecuperacao);
         personalization.addDynamicTemplateData("logo_url", logoUrl);
-
 
         List<Map<String, String>> itemsAsMaps = itens.stream()
                 .map(item -> Map.of(
@@ -72,13 +71,15 @@ public class EmailService {
                         "price", item.getPrice()
                 ))
                 .collect(Collectors.toList());
-
         personalization.addDynamicTemplateData("items", itemsAsMaps);
 
         mail.addPersonalization(personalization);
 
+        // Assunto pode ser definido no painel do SendGrid, dentro do template.
+        // mail.setSubject("Você esqueceu algo no seu carrinho!");
 
-        mail.setTemplateId("d-8fbd711045fb4f63ab851beda397f2c3");
+        // Usa o ID do template recebido como parâmetro
+        mail.setTemplateId(templateId); // <-- MUDANÇA AQUI
 
         SendGrid sg = new SendGrid(sendGridApiKey);
         Request request = new Request();
@@ -89,12 +90,11 @@ public class EmailService {
             request.setBody(mail.build());
             Response response = sg.api(request);
 
-            logger.info("E-mail com template enviado para: {}", paraEmail);
+            logger.info("E-mail com template {} enviado para: {}", templateId, paraEmail);
             logger.info("Status do envio: {}", response.getStatusCode());
             if (response.getStatusCode() >= 400) {
                 logger.error("Corpo da resposta de erro do SendGrid: {}", response.getBody());
             }
-
         } catch (IOException ex) {
             logger.error("Falha ao enviar e-mail via SendGrid", ex);
             throw ex;

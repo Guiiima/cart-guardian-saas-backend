@@ -157,6 +157,9 @@ public class WebhookController {
         checkout.setLojaId(shop.getId());
         checkout.setShopifyCheckoutId(checkoutData.getId().toString());
         checkout.setCustomerEmail(checkoutData.getEmail());
+        if (checkoutData.getCustomer() != null) {
+            checkout.setCustomerFirstName(checkoutData.getCustomer().getFirstName());
+        }
         checkout.setRecoveryUrl(checkoutData.getAbandonedCheckoutUrl());
         checkout.setShopUrl(shopUrl);
         checkout.setStatus("PENDING");

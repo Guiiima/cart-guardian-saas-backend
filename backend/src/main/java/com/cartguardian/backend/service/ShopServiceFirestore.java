@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -22,7 +21,7 @@ public class ShopServiceFirestore {
 
     public void saveOrUpdateShop(String shopUrl, String accessToken, String apiSecret) {
         try {
-            var db = FirestoreClient.getFirestore();
+            Firestore db = FirestoreClient.getFirestore();
             var query = db.collection(COLLECTION_NAME)
                     .whereEqualTo("shopUrl", shopUrl)
                     .limit(1);
@@ -37,9 +36,8 @@ public class ShopServiceFirestore {
                         "active", true
                 )).get();
 
-                log.info("Loja {} atualizada com sucesso.", shopUrl);
+                log.info(" Loja [{}] atualizada com sucesso.", shopUrl);
             } else {
-                // Cria nova loja
                 var newShop = new Shop();
                 newShop.setShopUrl(shopUrl);
                 newShop.setAccessToken(accessToken);
@@ -51,19 +49,22 @@ public class ShopServiceFirestore {
                 newShop.setId(newShopRef.getId());
 
                 newShopRef.set(newShop).get();
-                log.info("Nova loja {} criada com sucesso com ID: {}", shopUrl, newShopRef.getId());
+                log.info(" Nova loja [{}] criada com sucesso. ID: {}", shopUrl, newShopRef.getId());
             }
+
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // boa prática em interrupções
+            Thread.currentThread().interrupt();
+            log.error("Thread interrompida ao salvar/atualizar loja [{}]: {}", shopUrl, e.getMessage(), e);
             throw new RuntimeException("Thread interrompida ao salvar ou atualizar a loja", e);
         } catch (ExecutionException e) {
+            log.error("Erro de execução ao salvar/atualizar loja [{}]: {}", shopUrl, e.getMessage(), e);
             throw new RuntimeException("Erro ao salvar ou atualizar a loja no Firestore", e);
         }
     }
 
     public Optional<Shop> findShopByUrl(String shopUrl) {
         try {
-            var db = FirestoreClient.getFirestore();
+            Firestore db = FirestoreClient.getFirestore();
             var query = db.collection(COLLECTION_NAME)
                     .whereEqualTo("shopUrl", shopUrl)
                     .limit(1);
@@ -74,18 +75,37 @@ public class ShopServiceFirestore {
             if (!documents.isEmpty()) {
                 var doc = documents.get(0);
                 var shop = doc.toObject(Shop.class);
-                if (shop != null) {
-                    shop.setId(doc.getId());
-                    return Optional.of(shop);
-                }
+                shop.setId(doc.getId());
+
+                log.debug("Loja encontrada: [{}], ID: {}", shopUrl, shop.getId());
+                return Optional.of(shop);
             }
+
+            log.warn("Nenhuma loja encontrada para shopUrl=[{}]", shopUrl);
             return Optional.empty();
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.error("Thread interrompida ao buscar loja [{}]: {}", shopUrl, e.getMessage(), e);
             throw new RuntimeException("Thread interrompida ao buscar loja", e);
         } catch (ExecutionException e) {
+            log.error("Erro de execução ao buscar loja [{}]: {}", shopUrl, e.getMessage(), e);
             throw new RuntimeException("Erro ao buscar loja no Firestore", e);
         }
+    }
+
+    /**
+     * Atualiza apenas a URL da logo para uma loja específica.
+     *
+     * @param lojaId     O ID do documento da loja no Firestore.
+     * @param newLogoUrl A nova URL da logo a ser salva.
+     */
+    public void updateLogoUrl(String lojaId, String newLogoUrl) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        DocumentReference shopRef = db.collection(COLLECTION_NAME).document(lojaId);
+
+        shopRef.update("logoUrl", newLogoUrl).get();
+
+        log.info("🖼Logo da loja [{}] atualizada com sucesso para [{}]", lojaId, newLogoUrl);
     }
 }
